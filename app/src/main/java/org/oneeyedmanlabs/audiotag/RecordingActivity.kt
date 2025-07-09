@@ -12,6 +12,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
@@ -73,6 +74,8 @@ class RecordingActivity : ComponentActivity() {
         // Initialize TTS
         ttsService.initialize {
             Log.d("RecordingActivity", "TTS initialized")
+            // Give initial instruction when TTS is ready
+            ttsService.speak("Ready to record. Tap anywhere on the screen to start recording.")
         }
         
         setContent {
@@ -110,13 +113,13 @@ class RecordingActivity : ComponentActivity() {
     
     private fun startCountdown() {
         recordingState.value = RecordingState.COUNTDOWN
-        ttsService.speak("Get ready. Recording in 3, 2, 1")
+        ttsService.speak("Get ready. When recording starts, tap anywhere on the screen to finish. Recording in 3, 2, 1")
         
         // Start countdown after TTS
         lifecycleScope.launch {
-            delay(3000) // Wait for TTS
+            delay(5000) // Wait longer for the full TTS message
             playBeeps(3) // Countdown beeps
-            delay(1500) // Time for beeps
+            delay(2500) // Longer delay to ensure "one" is completely finished
             startRecording()
         }
     }
@@ -141,12 +144,9 @@ class RecordingActivity : ComponentActivity() {
                 val secondsLeft = (millisUntilFinished / 1000).toInt()
                 timeRemaining.value = secondsLeft
                 
-                // Warning beeps at 5 and 3 seconds
+                // Warning beeps at 5 and 3 seconds (no voice to avoid recording it)
                 if (secondsLeft == 5 || secondsLeft == 3) {
                     playBeeps(1)
-                    if (secondsLeft == 5) {
-                        ttsService.speak("5 seconds remaining")
-                    }
                 }
             }
             
@@ -220,7 +220,14 @@ fun RecordingScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
+            .padding(24.dp)
+            .then(
+                when (recordingState) {
+                    RecordingState.READY -> Modifier.clickable { onStartRecording() }
+                    RecordingState.RECORDING -> Modifier.clickable { onStopRecording() }
+                    else -> Modifier
+                }
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(32.dp)
     ) {
@@ -243,22 +250,52 @@ fun RecordingScreen(
         // Reduced spacer - less empty space
         Spacer(modifier = Modifier.height(32.dp))
         
-        // Action Buttons - Now take up more space
+        // Action Area
         when (recordingState) {
             RecordingState.READY -> {
-                ReadyButtons(
-                    onStartRecording = onStartRecording,
-                    onCancel = onCancel
-                )
+                // Large call-to-action card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = "👆",
+                                fontSize = 40.sp
+                            )
+                            Text(
+                                text = "Tap to Start",
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Touch anywhere on this screen",
+                                fontSize = 16.sp,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
             }
             RecordingState.COUNTDOWN -> {
                 CountdownDisplay()
             }
             RecordingState.RECORDING -> {
-                RecordingButtons(
-                    onStopRecording = onStopRecording,
-                    timeRemaining = timeRemaining
-                )
+                // No buttons needed - entire screen is tappable
+                Spacer(modifier = Modifier.height(140.dp))
             }
             RecordingState.COMPLETED -> {
                 CompletedState(onCancel = onCancel)
@@ -309,15 +346,45 @@ fun RecordingStatusCard(
         ) {
             when (recordingState) {
                 RecordingState.READY -> {
+                    // Large animated microphone icon
+                    val infiniteTransition = rememberInfiniteTransition(label = "ready")
+                    val scale by infiniteTransition.animateFloat(
+                        initialValue = 0.9f,
+                        targetValue = 1.1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1000),
+                            repeatMode = RepeatMode.Reverse
+                        ), label = "scale"
+                    )
+                    
+                    Box(
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(CircleShape)
+                            .background(
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "🎤",
+                            fontSize = (64 * scale).sp,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                    
                     Text(
-                        text = "🎤 Ready to Record",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
+                        text = "Ready to Record",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Tap 'Start Recording' when ready",
-                        fontSize = 16.sp,
-                        textAlign = TextAlign.Center
+                        text = "Tap anywhere to start recording",
+                        fontSize = 18.sp,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
                     )
                 }
                 RecordingState.COUNTDOWN -> {
@@ -364,8 +431,14 @@ fun RecordingStatusCard(
                         color = MaterialTheme.colorScheme.error
                     )
                     Text(
-                        text = "${timeRemaining}s remaining",
+                        text = "Tap anywhere to finish",
                         fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "${timeRemaining}s remaining",
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -400,54 +473,6 @@ fun RecordingStatusCard(
     }
 }
 
-@Composable
-fun ReadyButtons(
-    onStartRecording: () -> Unit,
-    onCancel: () -> Unit
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(24.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        // Much larger start recording button
-        Button(
-            onClick = onStartRecording,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp), // Much taller
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            )
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "🎤",
-                    fontSize = 32.sp
-                )
-                Text(
-                    text = "Start Recording",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-        
-        OutlinedButton(
-            onClick = onCancel,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(72.dp) // Larger cancel button too
-        ) {
-            Text(
-                text = "Cancel",
-                fontSize = 20.sp
-            )
-        }
-    }
-}
 
 @Composable
 fun CountdownDisplay() {
@@ -484,42 +509,6 @@ fun CountdownDisplay() {
     }
 }
 
-@Composable
-fun RecordingButtons(
-    onStopRecording: () -> Unit,
-    timeRemaining: Int
-) {
-    // Very large stop button - takes up lots of space for easy access
-    Button(
-        onClick = onStopRecording,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(140.dp), // Very tall stop button
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.error
-        )
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "⏹️",
-                fontSize = 40.sp
-            )
-            Text(
-                text = "STOP RECORDING",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "${timeRemaining}s left",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
 
 @Composable
 fun CompletedState(
