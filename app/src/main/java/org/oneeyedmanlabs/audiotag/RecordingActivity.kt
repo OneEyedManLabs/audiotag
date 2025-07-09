@@ -27,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -373,8 +375,12 @@ fun RecordingScreen(
             .padding(24.dp)
             .then(
                 when (recordingState) {
-                    RecordingState.READY -> Modifier.clickable { onStartRecording() }
-                    RecordingState.RECORDING -> Modifier.clickable { onStopRecording() }
+                    RecordingState.READY -> Modifier
+                        .clickable { onStartRecording() }
+                        .semantics { contentDescription = "Ready to record. Tap anywhere on the screen to start recording." }
+                    RecordingState.RECORDING -> Modifier
+                        .clickable { onStopRecording() }
+                        .semantics { contentDescription = "Recording in progress. Tap anywhere on the screen to finish." }
                     else -> Modifier
                 }
             ),
@@ -712,6 +718,7 @@ fun CompletedState(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(72.dp)
+                .semantics { contentDescription = "Discard recording and return to main screen" }
         ) {
             Text(
                 text = "Discard & Go Back",
@@ -729,7 +736,8 @@ fun ErrorButtons(
         onClick = onCancel,
         modifier = Modifier
             .fillMaxWidth()
-            .height(72.dp) // Larger error button too
+            .height(72.dp)
+            .semantics { contentDescription = "Return to main screen" }
     ) {
         Text(
             text = "Go Back",

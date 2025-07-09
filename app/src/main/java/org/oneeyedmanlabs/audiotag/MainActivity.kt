@@ -11,6 +11,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -162,7 +164,8 @@ fun MainScreen(
                 onClick = onRecordAudio,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(72.dp),
+                    .height(72.dp)
+                    .semantics { contentDescription = "Record new audio tag. Tap to start recording." },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary
                 )
@@ -179,7 +182,8 @@ fun MainScreen(
                 onClick = onMyTags,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(72.dp),
+                    .height(72.dp)
+                    .semantics { contentDescription = "View and manage saved audio tags" },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.secondary
                 )
@@ -197,6 +201,7 @@ fun MainScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
+                    .semantics { contentDescription = "Open app settings and preferences" }
             ) {
                 Text(
                     text = "⚙️ Settings",
@@ -210,6 +215,7 @@ fun MainScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
+                    .semantics { contentDescription = "View help and usage instructions" }
             ) {
                 Text(
                     text = "❓ Help",

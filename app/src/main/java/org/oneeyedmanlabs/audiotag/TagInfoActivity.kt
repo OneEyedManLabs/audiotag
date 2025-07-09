@@ -23,6 +23,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -68,7 +70,12 @@ class TagInfoActivity : ComponentActivity() {
         repository = application.repository
         nfcService = NFCService()
         ttsService = TTSService(this)
-        vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            getSystemService(Vibrator::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
         
         // Check if this was a background launch vs foreground launch
@@ -614,7 +621,10 @@ fun PlaybackButtons(
             onClick = onPlayAudio,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(120.dp),
+                .height(120.dp)
+                .semantics { 
+                    contentDescription = if (isBackgroundLaunch) "Play this audio tag" else "Play this audio tag again"
+                },
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary
             )
@@ -641,10 +651,11 @@ fun PlaybackButtons(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(72.dp)
+                .semantics { contentDescription = "Edit this tag's title, description, and groups" }
         ) {
             Icon(
                 imageVector = Icons.Default.Edit,
-                contentDescription = "Edit",
+                contentDescription = null, // Icon description handled by button
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
@@ -660,6 +671,7 @@ fun PlaybackButtons(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(72.dp)
+                .semantics { contentDescription = "Close tag information and return to main screen" }
         ) {
             Text(
                 text = "Close",
@@ -684,7 +696,8 @@ fun PlayingButtons(
             onClick = onStopAudio,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(120.dp),
+                .height(120.dp)
+                .semantics { contentDescription = "Stop playing this audio tag" },
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.error
             )
