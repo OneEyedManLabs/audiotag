@@ -274,7 +274,27 @@ fun NFCWritingScreen(
                 WritingDisplay()
             }
             WritingState.SUCCESS -> {
-                SuccessButtons(onCancel = onCancel)
+                // No button needed - automatically closing
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(72.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Opening tag info...",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
             }
             WritingState.ERROR -> {
                 ErrorButtons(
@@ -432,24 +452,6 @@ fun WritingDisplay() {
     }
 }
 
-@Composable
-fun SuccessButtons(onCancel: () -> Unit) {
-    Button(
-        onClick = onCancel,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(72.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary
-        )
-    ) {
-        Text(
-            text = "Done",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
 
 @Composable
 fun ErrorButtons(
