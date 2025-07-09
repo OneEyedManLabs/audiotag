@@ -56,6 +56,7 @@ class NFCDispatchActivity : Activity() {
                 // Launch TagInfoActivity with the tag ID
                 val tagInfoIntent = Intent(this, TagInfoActivity::class.java).apply {
                     putExtra("tag_id", tagId)
+                    putExtra("from_nfc_scan", true) // Mark this as coming from NFC scan
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 

@@ -10,6 +10,8 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,6 +49,7 @@ class TagInfoActivity : ComponentActivity() {
     // State
     private var tagEntity = mutableStateOf<TagEntity?>(null)
     private var playbackState = mutableStateOf(PlaybackState.IDLE)
+    private var showEditDialog = mutableStateOf(false)
     private var isBackgroundLaunch = false
     private var hasPlayedAutomatically = false
     
@@ -62,11 +65,17 @@ class TagInfoActivity : ComponentActivity() {
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
         
         // Check if this was a background launch vs foreground launch
-        // Auto-play for: NFC writing completion, foreground NFC scans, auto_play flag, or when launched from task root
+        // Auto-play for: NFC writing completion, foreground NFC scans, auto_play flag, tag list launches, NFC intents, or when launched from task root
+        val isNFCIntent = intent.action == NfcAdapter.ACTION_TAG_DISCOVERED ||
+                         intent.action == NfcAdapter.ACTION_NDEF_DISCOVERED ||
+                         intent.action == NfcAdapter.ACTION_TECH_DISCOVERED ||
+                         intent.getBooleanExtra("from_nfc_scan", false)
         isBackgroundLaunch = !isTaskRoot && 
                            intent.getBooleanExtra("from_nfc_writing", false) != true &&
                            intent.getBooleanExtra("foreground_nfc_scan", false) != true &&
-                           intent.getBooleanExtra("auto_play", false) != true
+                           intent.getBooleanExtra("auto_play", false) != true &&
+                           intent.getBooleanExtra("from_tag_list", false) != true &&
+                           !isNFCIntent
         
         // Initialize TTS
         ttsService.initialize {
@@ -85,10 +94,14 @@ class TagInfoActivity : ComponentActivity() {
                     TagInfoScreen(
                         tagEntity = tagEntity.value,
                         playbackState = playbackState.value,
+                        showEditDialog = showEditDialog.value,
                         isBackgroundLaunch = isBackgroundLaunch,
                         hasPlayedAutomatically = hasPlayedAutomatically,
                         onPlayAudio = { playAudio() },
                         onStopAudio = { stopAudio() },
+                        onEditTag = { showEditDialog.value = true },
+                        onConfirmEdit = { newLabel -> editTag(newLabel) },
+                        onDismissEdit = { showEditDialog.value = false },
                         onClose = { navigateToMain() }
                     )
                 }
@@ -120,8 +133,9 @@ class TagInfoActivity : ComponentActivity() {
         
         if (tagId != null) {
             // If this is a new NFC intent (not initial launch), treat as foreground scan
-            if (extractTagIdFromNFCIntent(intent) != null) {
+            if (extractTagIdFromNFCIntent(intent) != null || intent.getBooleanExtra("from_nfc_scan", false)) {
                 // Reset auto-play state for new NFC scan
+                Log.d("TagInfoActivity", "New NFC intent detected - resetting auto-play state")
                 hasPlayedAutomatically = false
                 isBackgroundLaunch = false
             }
@@ -152,11 +166,14 @@ class TagInfoActivity : ComponentActivity() {
                     tagEntity.value = tag
                     
                     // If this is a foreground NFC scan and we haven't played yet, auto-play
+                    Log.d("TagInfoActivity", "Auto-play check: isBackgroundLaunch=$isBackgroundLaunch, hasPlayedAutomatically=$hasPlayedAutomatically")
                     if (!isBackgroundLaunch && !hasPlayedAutomatically) {
                         Log.d("TagInfoActivity", "Foreground NFC scan - auto-playing audio")
                         hasPlayedAutomatically = true
                         delay(500) // Brief delay for UI to load
                         playAudio()
+                    } else {
+                        Log.d("TagInfoActivity", "Auto-play skipped - conditions not met")
                     }
                 } else {
                     Log.w("TagInfoActivity", "Tag not found: $tagId")
@@ -269,6 +286,26 @@ class TagInfoActivity : ComponentActivity() {
         nfcAdapter?.disableForegroundDispatch(this)
     }
     
+    private fun editTag(newLabel: String) {
+        val currentTag = tagEntity.value ?: return
+        
+        lifecycleScope.launch {
+            try {
+                val updatedTag = currentTag.copy(label = newLabel.trim())
+                repository.updateTag(updatedTag)
+                Log.d("TagInfoActivity", "Updated tag label: ${currentTag.tagId} -> $newLabel")
+                
+                // Update the local state
+                tagEntity.value = updatedTag
+                showEditDialog.value = false
+                
+            } catch (e: Exception) {
+                Log.e("TagInfoActivity", "Error updating tag", e)
+                showEditDialog.value = false
+            }
+        }
+    }
+    
     private fun navigateToMain() {
         val mainIntent = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -293,10 +330,14 @@ enum class PlaybackState {
 fun TagInfoScreen(
     tagEntity: TagEntity?,
     playbackState: PlaybackState,
+    showEditDialog: Boolean,
     isBackgroundLaunch: Boolean,
     hasPlayedAutomatically: Boolean,
     onPlayAudio: () -> Unit,
     onStopAudio: () -> Unit,
+    onEditTag: () -> Unit,
+    onConfirmEdit: (String) -> Unit,
+    onDismissEdit: () -> Unit,
     onClose: () -> Unit
 ) {
     Column(
@@ -336,6 +377,7 @@ fun TagInfoScreen(
                 PlaybackState.IDLE -> {
                     PlaybackButtons(
                         onPlayAudio = onPlayAudio,
+                        onEditTag = onEditTag,
                         onClose = onClose,
                         isBackgroundLaunch = isBackgroundLaunch
                     )
@@ -343,6 +385,7 @@ fun TagInfoScreen(
                 PlaybackState.PLAYING -> {
                     PlayingButtons(
                         onStopAudio = onStopAudio,
+                        onEditTag = onEditTag,
                         onClose = onClose
                     )
                 }
@@ -358,6 +401,15 @@ fun TagInfoScreen(
                 CircularProgressIndicator()
             }
         }
+    }
+    
+    // Edit dialog
+    if (showEditDialog) {
+        EditTagDialog(
+            currentLabel = tagEntity?.label ?: "",
+            onConfirm = onConfirmEdit,
+            onDismiss = onDismissEdit
+        )
     }
 }
 
@@ -468,6 +520,7 @@ fun LoadingCard() {
 @Composable
 fun PlaybackButtons(
     onPlayAudio: () -> Unit,
+    onEditTag: () -> Unit,
     onClose: () -> Unit,
     isBackgroundLaunch: Boolean
 ) {
@@ -501,6 +554,25 @@ fun PlaybackButtons(
             }
         }
         
+        // Edit button
+        OutlinedButton(
+            onClick = onEditTag,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(72.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = "Edit",
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Edit Tag",
+                fontSize = 20.sp
+            )
+        }
+        
         // Close button
         OutlinedButton(
             onClick = onClose,
@@ -519,6 +591,7 @@ fun PlaybackButtons(
 @Composable
 fun PlayingButtons(
     onStopAudio: () -> Unit,
+    onEditTag: () -> Unit,
     onClose: () -> Unit
 ) {
     Column(
@@ -551,6 +624,25 @@ fun PlayingButtons(
             }
         }
         
+        // Edit button
+        OutlinedButton(
+            onClick = onEditTag,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(72.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = "Edit",
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Edit Tag",
+                fontSize = 20.sp
+            )
+        }
+        
         // Close button
         OutlinedButton(
             onClick = onClose,
@@ -564,4 +656,54 @@ fun PlayingButtons(
             )
         }
     }
+}
+@Composable
+fun EditTagDialog(
+    currentLabel: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var textValue by remember { mutableStateOf(currentLabel) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Edit Tag",
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "Enter a new label for this tag:",
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                OutlinedTextField(
+                    value = textValue,
+                    onValueChange = { textValue = it },
+                    label = { Text("Tag Label") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (textValue.trim().isNotEmpty()) {
+                        onConfirm(textValue.trim())
+                    }
+                },
+                enabled = textValue.trim().isNotEmpty()
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
