@@ -7,6 +7,7 @@ import android.os.Vibrator
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -82,7 +83,7 @@ class TagListActivity : ComponentActivity() {
                         currentlyPlayingTag = currentlyPlayingTag.value,
                         onPlayTag = { tag -> playTag(tag) },
                         onStopTag = { tag -> stopTag(tag) },
-                        onEditTag = { tag -> editTag(tag) },
+                        onCardClick = { tag -> openTagInfo(tag) },
                         onDeleteTag = { tag -> showDeleteDialog.value = tag },
                         onConfirmDelete = { tag -> deleteTag(tag) },
                         onDismissDeleteDialog = { showDeleteDialog.value = null },
@@ -198,11 +199,11 @@ class TagListActivity : ComponentActivity() {
         }
     }
     
-    private fun editTag(tag: TagEntity) {
+    private fun openTagInfo(tag: TagEntity) {
         val intent = Intent(this, TagInfoActivity::class.java).apply {
             putExtra("tag_id", tag.tagId)
             putExtra("from_tag_list", true) // Mark as coming from tag list
-            putExtra("edit_mode", true) // Mark as edit mode
+            // Don't auto-play when coming from card click
         }
         startActivity(intent)
     }
@@ -239,7 +240,7 @@ fun TagListScreen(
     currentlyPlayingTag: String?,
     onPlayTag: (TagEntity) -> Unit,
     onStopTag: (TagEntity) -> Unit,
-    onEditTag: (TagEntity) -> Unit,
+    onCardClick: (TagEntity) -> Unit,
     onDeleteTag: (TagEntity) -> Unit,
     onConfirmDelete: (TagEntity) -> Unit,
     onDismissDeleteDialog: () -> Unit,
@@ -293,7 +294,7 @@ fun TagListScreen(
                     currentlyPlayingTag = currentlyPlayingTag,
                     onPlayTag = onPlayTag,
                     onStopTag = onStopTag,
-                    onEditTag = onEditTag,
+                    onCardClick = onCardClick,
                     onDeleteTag = onDeleteTag
                 )
             }
@@ -366,7 +367,7 @@ fun TagList(
     currentlyPlayingTag: String?,
     onPlayTag: (TagEntity) -> Unit,
     onStopTag: (TagEntity) -> Unit,
-    onEditTag: (TagEntity) -> Unit,
+    onCardClick: (TagEntity) -> Unit,
     onDeleteTag: (TagEntity) -> Unit
 ) {
     LazyColumn(
@@ -378,7 +379,7 @@ fun TagList(
                 isPlaying = currentlyPlayingTag == tag.tagId,
                 onPlayTag = { onPlayTag(tag) },
                 onStopTag = { onStopTag(tag) },
-                onEditTag = { onEditTag(tag) },
+                onCardClick = { onCardClick(tag) },
                 onDeleteTag = { onDeleteTag(tag) }
             )
         }
@@ -391,11 +392,13 @@ fun TagListItem(
     isPlaying: Boolean,
     onPlayTag: () -> Unit,
     onStopTag: () -> Unit,
-    onEditTag: () -> Unit,
+    onCardClick: () -> Unit,
     onDeleteTag: () -> Unit
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCardClick() },
         colors = CardDefaults.cardColors(
             containerColor = if (isPlaying) {
                 MaterialTheme.colorScheme.primaryContainer
@@ -482,51 +485,26 @@ fun TagListItem(
                     )
                 }
                 
-                // Edit and Delete buttons row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Delete button
+                OutlinedButton(
+                    onClick = onDeleteTag,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
                 ) {
-                    // Edit button
-                    OutlinedButton(
-                        onClick = onEditTag,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Edit",
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Edit",
-                            fontSize = 16.sp
-                        )
-                    }
-                    
-                    // Delete button
-                    OutlinedButton(
-                        onClick = onDeleteTag,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete",
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Delete",
-                            fontSize = 16.sp
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Delete",
+                        fontSize = 16.sp
+                    )
                 }
             }
         }

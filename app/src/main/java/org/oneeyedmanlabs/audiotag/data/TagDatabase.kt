@@ -24,7 +24,8 @@ abstract class TagDatabase : RoomDatabase() {
                     context.applicationContext,
                     TagDatabase::class.java,
                     "tag_database"
-                ).build()
+                ).fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }
