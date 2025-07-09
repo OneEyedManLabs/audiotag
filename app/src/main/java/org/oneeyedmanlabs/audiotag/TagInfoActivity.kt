@@ -1,10 +1,13 @@
 package org.oneeyedmanlabs.audiotag
 
+import android.content.Context
 import android.content.Intent
 import android.media.MediaPlayer
 import android.nfc.NfcAdapter
 import android.nfc.Tag
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -65,7 +68,7 @@ class TagInfoActivity : ComponentActivity() {
         repository = application.repository
         nfcService = NFCService()
         ttsService = TTSService(this)
-        vibrator = getSystemService(VIBRATOR_SERVICE) as? Vibrator
+        vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
         
         // Check if this was a background launch vs foreground launch
@@ -117,6 +120,12 @@ class TagInfoActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         enableNFCForegroundDispatch()
+        
+        // Refresh tag data when returning from re-recording
+        val currentTag = tagEntity.value
+        if (currentTag != null) {
+            loadTagInfo(currentTag.tagId)
+        }
     }
     
     override fun onPause() {
@@ -157,7 +166,12 @@ class TagInfoActivity : ComponentActivity() {
             NfcAdapter.ACTION_NDEF_DISCOVERED == action ||
             NfcAdapter.ACTION_TECH_DISCOVERED == action) {
             
-            val tag = intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
+            val tag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
+            }
             return tag?.let { nfcService.getTagIdFromIntent(intent) }
         }
         return null
@@ -193,11 +207,22 @@ class TagInfoActivity : ComponentActivity() {
         }
     }
     
+    private fun vibrateCompat(duration: Long) {
+        vibrator?.let { vibrator ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(duration)
+            }
+        }
+    }
+    
     private fun playAudio() {
         val tag = tagEntity.value ?: return
         
         playbackState.value = PlaybackState.PLAYING
-        vibrator?.vibrate(100)
+        vibrateCompat(100)
         
         when (tag.type) {
             "tts" -> {

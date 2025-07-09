@@ -1,8 +1,11 @@
 package org.oneeyedmanlabs.audiotag
 
+import android.content.Context
 import android.content.Intent
 import android.media.MediaPlayer
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -63,7 +66,7 @@ class TagListActivity : ComponentActivity() {
         val application = application as AudioTaggerApplication
         repository = application.repository
         ttsService = TTSService(this)
-        vibrator = getSystemService(VIBRATOR_SERVICE) as? Vibrator
+        vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
         
         // Initialize TTS
         ttsService.initialize {
@@ -134,12 +137,23 @@ class TagListActivity : ComponentActivity() {
         tags.value = filteredTags
     }
     
+    private fun vibrateCompat(duration: Long) {
+        vibrator?.let { vibrator ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(duration)
+            }
+        }
+    }
+    
     private fun playTag(tag: TagEntity) {
         // Stop any currently playing audio
         stopAllAudio()
         
         currentlyPlayingTag.value = tag.tagId
-        vibrator?.vibrate(100)
+        vibrateCompat(100)
         
         when (tag.type) {
             "tts" -> {

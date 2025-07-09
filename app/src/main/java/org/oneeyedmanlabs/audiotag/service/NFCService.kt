@@ -6,6 +6,7 @@ import android.nfc.NdefRecord
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.nfc.tech.Ndef
+import android.os.Build
 import android.util.Log
 import java.io.UnsupportedEncodingException
 
@@ -28,7 +29,12 @@ class NFCService {
         }
         
         // Fallback to hardware tag ID from Intent
-        val tag = intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
+        val tag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra<Tag>(NfcAdapter.EXTRA_TAG)
+        }
         if (tag != null) {
             val hardwareId = bytesToHexString(tag.id)
             Log.d("NFCService", "Using hardware tag ID from Intent: $hardwareId")
@@ -41,7 +47,12 @@ class NFCService {
     
     fun readAudioTaggerIdFromIntent(intent: Intent): String? {
         // For NDEF_DISCOVERED intents, the NDEF message is included in the intent
-        val ndefMessages = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES)
+        val ndefMessages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES, NdefMessage::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES)
+        }
         
         if (ndefMessages != null && ndefMessages.isNotEmpty()) {
             for (ndefMessageParcelable in ndefMessages) {

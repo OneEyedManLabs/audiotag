@@ -1,10 +1,15 @@
 package org.oneeyedmanlabs.audiotag
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.ToneGenerator
+import android.media.AudioManager
+import android.os.Build
 import android.os.Bundle
 import android.os.CountDownTimer
+import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -76,7 +81,12 @@ class RecordingActivity : ComponentActivity() {
         // Initialize services
         audioRecordingService = AudioRecordingService(this)
         ttsService = TTSService(this)
-        vibrator = getSystemService(VIBRATOR_SERVICE) as? Vibrator
+        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            getSystemService(Vibrator::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
         
         // Check if this is a re-recording
         checkRerecordingIntent()
@@ -141,19 +151,17 @@ class RecordingActivity : ComponentActivity() {
     
     private fun startCountdown() {
         recordingState.value = RecordingState.COUNTDOWN
-        ttsService.speak("Get ready. When recording starts, tap anywhere on the screen to finish. Recording in beep beep beeeep")
+        ttsService.speak("Get ready. When recording starts, tap anywhere on the screen to finish.")
         
         // Start countdown after TTS - adjust timing based on TTS setting
         lifecycleScope.launch {
             val ttsEnabled = SettingsActivity.getTTSEnabled(this@RecordingActivity)
             if (ttsEnabled) {
-                delay(5000) // Wait for the full TTS message
+                delay(4000) // Wait for the TTS message
             } else {
                 delay(1000) // Much shorter delay when TTS is disabled
             }
-            playBeeps(3) // Countdown beeps
-            delay(2500) // Longer delay to ensure beeps are completely finished
-            startRecording()
+            playCountdownBeeps() // This function handles its own delays and calls startRecording()
         }
     }
     
@@ -164,7 +172,7 @@ class RecordingActivity : ComponentActivity() {
         if (recordedFilePath != null) {
             recordingState.value = RecordingState.RECORDING
             startTimer()
-            vibrator?.vibrate(100) // Haptic feedback
+            vibrateCompat(100) // Haptic feedback
         } else {
             recordingState.value = RecordingState.ERROR
             ttsService.speak("Failed to start recording")
@@ -195,7 +203,7 @@ class RecordingActivity : ComponentActivity() {
         
         if (recordedFilePath != null) {
             recordingState.value = RecordingState.COMPLETED
-            vibrator?.vibrate(200) // Completion haptic
+            vibrateCompat(200) // Completion haptic
             playBeeps(2) // Success beeps
             
             if (isRerecording) {
@@ -263,10 +271,74 @@ class RecordingActivity : ComponentActivity() {
     
     // Removed proceedToNFCWriting - now automatic
     
+    private fun vibrateCompat(duration: Long) {
+        vibrator?.let { vibrator ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(duration)
+            }
+        }
+    }
+    
+    private fun playCountdownBeeps() {
+        // Standard recording countdown: three short beeps, one long beep
+        lifecycleScope.launch {
+            val toneGen = ToneGenerator(AudioManager.STREAM_SYSTEM, 40) // Reduced volume to 40%
+            try {
+                // First short beep - 0.25s ON (higher frequency tone)
+                toneGen.startTone(ToneGenerator.TONE_DTMF_D) // Higher frequency
+                vibrateCompat(30)
+                delay(250) // 0.25s beep (reduced duration)
+                toneGen.stopTone()
+                delay(500) // 0.5s OFF (increased gap)
+                
+                // Second short beep - 0.25s ON (higher frequency tone)
+                toneGen.startTone(ToneGenerator.TONE_DTMF_D) // Higher frequency
+                vibrateCompat(30)
+                delay(250) // 0.25s beep (reduced duration)
+                toneGen.stopTone()
+                delay(500) // 0.5s OFF (increased gap)
+                
+                // Third short beep - 0.25s ON (higher frequency tone)
+                toneGen.startTone(ToneGenerator.TONE_DTMF_D) // Higher frequency
+                vibrateCompat(30)
+                delay(250) // 0.25s beep (reduced duration)
+                toneGen.stopTone()
+                delay(500) // Gap before long beep
+                
+                // Long beep to signal recording start - 1.5s continuous (same frequency)
+                toneGen.startTone(ToneGenerator.TONE_DTMF_D) // Same frequency as short beeps
+                vibrateCompat(150)
+                delay(1500) // 1.5s long beep
+                toneGen.stopTone()
+                
+                // Ensure all audio hardware has finished processing before recording
+                delay(600) // 0.6s delay to balance clean audio without losing recording start
+                
+            } finally {
+                toneGen.release()
+            }
+            
+            // Start recording only after all beeps are completely finished
+            startRecording()
+        }
+    }
+    
     private fun playBeeps(count: Int) {
-        // Simple system beep using ToneGenerator
-        repeat(count) {
-            vibrator?.vibrate(50)
+        // General purpose beeps (for success, warnings, etc.)
+        lifecycleScope.launch {
+            val toneGen = ToneGenerator(AudioManager.STREAM_SYSTEM, 60)
+            try {
+                repeat(count) {
+                    toneGen.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+                    vibrateCompat(50)
+                    delay(200)
+                }
+            } finally {
+                toneGen.release()
+            }
         }
     }
     
