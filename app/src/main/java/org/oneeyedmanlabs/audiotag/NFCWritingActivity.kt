@@ -174,7 +174,9 @@ class NFCWritingActivity : ComponentActivity() {
                         tagId = tagId!!,
                         type = "audio",
                         content = audioFilePath!!,
-                        label = generatedLabel,
+                        title = generatedLabel,
+                        description = null,
+                        groups = emptyList(),
                         createdAt = System.currentTimeMillis()
                     )
                 }

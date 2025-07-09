@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -49,9 +50,11 @@ class TagListActivity : ComponentActivity() {
     private var mediaPlayer: MediaPlayer? = null
     
     private var tags = mutableStateOf<List<TagEntity>>(emptyList())
+    private var allTags = mutableStateOf<List<TagEntity>>(emptyList())
     private var isLoading = mutableStateOf(true)
     private var showDeleteDialog = mutableStateOf<TagEntity?>(null)
     private var currentlyPlayingTag = mutableStateOf<String?>(null)
+    private var selectedGroup = mutableStateOf<String?>(null)
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -78,15 +81,18 @@ class TagListActivity : ComponentActivity() {
                 ) {
                     TagListScreen(
                         tags = tags.value,
+                        allTags = allTags.value,
                         isLoading = isLoading.value,
                         showDeleteDialog = showDeleteDialog.value,
                         currentlyPlayingTag = currentlyPlayingTag.value,
+                        selectedGroup = selectedGroup.value,
                         onPlayTag = { tag -> playTag(tag) },
                         onStopTag = { tag -> stopTag(tag) },
                         onCardClick = { tag -> openTagInfo(tag) },
                         onDeleteTag = { tag -> showDeleteDialog.value = tag },
                         onConfirmDelete = { tag -> deleteTag(tag) },
                         onDismissDeleteDialog = { showDeleteDialog.value = null },
+                        onGroupFilter = { group -> filterByGroup(group) },
                         onBack = { finish() }
                     )
                 }
@@ -98,16 +104,34 @@ class TagListActivity : ComponentActivity() {
         lifecycleScope.launch {
             try {
                 isLoading.value = true
-                val allTags = repository.getAllTagsList()
-                tags.value = allTags.sortedByDescending { it.createdAt }
-                Log.d("TagListActivity", "Loaded ${allTags.size} tags")
+                val loadedTags = repository.getAllTagsList().sortedByDescending { it.createdAt }
+                allTags.value = loadedTags
+                applyGroupFilter()
+                Log.d("TagListActivity", "Loaded ${loadedTags.size} tags")
             } catch (e: Exception) {
                 Log.e("TagListActivity", "Error loading tags", e)
+                allTags.value = emptyList()
                 tags.value = emptyList()
             } finally {
                 isLoading.value = false
             }
         }
+    }
+    
+    private fun filterByGroup(group: String?) {
+        selectedGroup.value = group
+        applyGroupFilter()
+    }
+    
+    private fun applyGroupFilter() {
+        val filteredTags = if (selectedGroup.value == null) {
+            allTags.value
+        } else {
+            allTags.value.filter { tag ->
+                tag.groups.contains(selectedGroup.value)
+            }
+        }
+        tags.value = filteredTags
     }
     
     private fun playTag(tag: TagEntity) {
@@ -235,21 +259,25 @@ class TagListActivity : ComponentActivity() {
 @Composable
 fun TagListScreen(
     tags: List<TagEntity>,
+    allTags: List<TagEntity>,
     isLoading: Boolean,
     showDeleteDialog: TagEntity?,
     currentlyPlayingTag: String?,
+    selectedGroup: String?,
     onPlayTag: (TagEntity) -> Unit,
     onStopTag: (TagEntity) -> Unit,
     onCardClick: (TagEntity) -> Unit,
     onDeleteTag: (TagEntity) -> Unit,
     onConfirmDelete: (TagEntity) -> Unit,
     onDismissDeleteDialog: () -> Unit,
+    onGroupFilter: (String?) -> Unit,
     onBack: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
+            .statusBarsPadding()
     ) {
         // Header with back button
         Row(
@@ -278,6 +306,18 @@ fun TagListScreen(
             )
             
             Spacer(modifier = Modifier.width(60.dp)) // Balance the back button
+        }
+        
+        // Group filter
+        if (!isLoading && allTags.isNotEmpty()) {
+            val availableGroups = allTags.flatMap { it.groups }.distinct().sorted()
+            if (availableGroups.isNotEmpty()) {
+                GroupFilterRow(
+                    availableGroups = availableGroups,
+                    selectedGroup = selectedGroup,
+                    onGroupFilter = onGroupFilter
+                )
+            }
         }
         
         // Content
@@ -423,7 +463,7 @@ fun TagListItem(
                 ) {
                     // Tag label
                     Text(
-                        text = tag.label.ifEmpty { "Untitled Tag" },
+                        text = tag.title.ifEmpty { "Untitled Tag" },
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -431,14 +471,60 @@ fun TagListItem(
                         overflow = TextOverflow.Ellipsis
                     )
                     
+                    // Description (if provided)
+                    if (!tag.description.isNullOrBlank()) {
+                        Text(
+                            text = tag.description,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    
+                    // Groups (if any)
+                    if (tag.groups.isNotEmpty()) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(top = 4.dp)
+                        ) {
+                            items(tag.groups.take(3)) { group -> // Limit to 3 groups in list view
+                                AssistChip(
+                                    onClick = { },
+                                    label = {
+                                        Text(
+                                            text = group,
+                                            fontSize = 12.sp
+                                        )
+                                    },
+                                    modifier = Modifier.height(24.dp),
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                    )
+                                )
+                            }
+                            if (tag.groups.size > 3) {
+                                item {
+                                    Text(
+                                        text = "+${tag.groups.size - 3}",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                        modifier = Modifier.padding(start = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
                     // Tag type and date
                     val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
                     val createdDate = Date(tag.createdAt)
                     
                     Text(
                         text = "${tag.type.uppercase()} • ${dateFormat.format(createdDate)}",
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
@@ -527,7 +613,7 @@ fun DeleteTagDialog(
         },
         text = {
             Text(
-                text = "Are you sure you want to delete \"${tag.label.ifEmpty { "Untitled Tag" }}\"? This action cannot be undone."
+                text = "Are you sure you want to delete \"${tag.title.ifEmpty { "Untitled Tag" }}\"? This action cannot be undone."
             )
         },
         confirmButton = {
@@ -546,4 +632,55 @@ fun DeleteTagDialog(
             }
         }
     )
+}
+
+@Composable
+fun GroupFilterRow(
+    availableGroups: List<String>,
+    selectedGroup: String?,
+    onGroupFilter: (String?) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        Text(
+            text = "Filter by group:",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // "All" filter option
+            item {
+                FilterChip(
+                    onClick = { onGroupFilter(null) },
+                    label = { Text("All") },
+                    selected = selectedGroup == null,
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                )
+            }
+            
+            // Group filter options
+            items(availableGroups) { group ->
+                FilterChip(
+                    onClick = { onGroupFilter(group) },
+                    label = { Text(group) },
+                    selected = selectedGroup == group,
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                )
+            }
+        }
+    }
 }

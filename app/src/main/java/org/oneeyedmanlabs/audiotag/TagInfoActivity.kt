@@ -10,6 +10,10 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -100,7 +104,7 @@ class TagInfoActivity : ComponentActivity() {
                         onPlayAudio = { playAudio() },
                         onStopAudio = { stopAudio() },
                         onEditTag = { showEditDialog.value = true },
-                        onConfirmEdit = { newLabel -> editTag(newLabel) },
+                        onConfirmEdit = { title, description, groups -> editTag(title, description, groups) },
                         onDismissEdit = { showEditDialog.value = false },
                         onClose = { navigateToMain() }
                     )
@@ -286,14 +290,18 @@ class TagInfoActivity : ComponentActivity() {
         nfcAdapter?.disableForegroundDispatch(this)
     }
     
-    private fun editTag(newLabel: String) {
+    private fun editTag(newTitle: String, newDescription: String?, newGroups: List<String>) {
         val currentTag = tagEntity.value ?: return
         
         lifecycleScope.launch {
             try {
-                val updatedTag = currentTag.copy(label = newLabel.trim())
+                val updatedTag = currentTag.copy(
+                    title = newTitle.trim(),
+                    description = newDescription?.trim()?.takeIf { it.isNotEmpty() },
+                    groups = newGroups.map { it.trim() }.filter { it.isNotEmpty() }
+                )
                 repository.updateTag(updatedTag)
-                Log.d("TagInfoActivity", "Updated tag label: ${currentTag.tagId} -> $newLabel")
+                Log.d("TagInfoActivity", "Updated tag: ${currentTag.tagId} -> title: $newTitle, desc: $newDescription, groups: $newGroups")
                 
                 // Update the local state
                 tagEntity.value = updatedTag
@@ -336,16 +344,14 @@ fun TagInfoScreen(
     onPlayAudio: () -> Unit,
     onStopAudio: () -> Unit,
     onEditTag: () -> Unit,
-    onConfirmEdit: (String) -> Unit,
+    onConfirmEdit: (String, String?, List<String>) -> Unit,
     onDismissEdit: () -> Unit,
     onClose: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(32.dp)
+            .padding(24.dp)
     ) {
         
         // Title
@@ -354,24 +360,31 @@ fun TagInfoScreen(
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 48.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 32.dp, bottom = 24.dp)
         )
         
-        // Tag Info Display
-        if (tagEntity != null) {
-            TagInfoCard(
-                tagEntity = tagEntity,
-                playbackState = playbackState,
-                isBackgroundLaunch = isBackgroundLaunch,
-                hasPlayedAutomatically = hasPlayedAutomatically
-            )
-        } else {
-            LoadingCard()
+        // Tag Info Display (scrollable content)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(bottom = 16.dp)
+        ) {
+            if (tagEntity != null) {
+                TagInfoCard(
+                    tagEntity = tagEntity,
+                    playbackState = playbackState,
+                    isBackgroundLaunch = isBackgroundLaunch,
+                    hasPlayedAutomatically = hasPlayedAutomatically
+                )
+            } else {
+                LoadingCard()
+            }
         }
         
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        // Action Buttons
+        // Action Buttons (fixed at bottom)
         if (tagEntity != null) {
             when (playbackState) {
                 PlaybackState.IDLE -> {
@@ -405,8 +418,8 @@ fun TagInfoScreen(
     
     // Edit dialog
     if (showEditDialog) {
-        EditTagDialog(
-            currentLabel = tagEntity?.label ?: "",
+        EnhancedEditTagDialog(
+            currentTag = tagEntity,
             onConfirm = onConfirmEdit,
             onDismiss = onDismissEdit
         )
@@ -433,9 +446,10 @@ fun TagInfoCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(32.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Tag icon based on type
             Text(
@@ -443,25 +457,51 @@ fun TagInfoCard(
                 fontSize = 48.sp
             )
             
-            // Tag label
+            // Tag title
             Text(
-                text = tagEntity.label.ifEmpty { "Untitled Tag" },
+                text = tagEntity.title.ifEmpty { "Untitled Tag" },
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
-            // Tag details
-            val dateFormat = SimpleDateFormat("MMM dd, yyyy 'at' h:mm a", Locale.getDefault())
-            val createdDate = Date(tagEntity.createdAt)
+            // Description (if provided)
+            if (!tagEntity.description.isNullOrBlank()) {
+                Text(
+                    text = tagEntity.description,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
             
-            Text(
-                text = "Created: ${dateFormat.format(createdDate)}",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // Groups (if any)
+            if (tagEntity.groups.isNotEmpty()) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                ) {
+                    items(tagEntity.groups) { group ->
+                        AssistChip(
+                            onClick = { },
+                            label = {
+                                Text(
+                                    text = group,
+                                    fontSize = 14.sp
+                                )
+                            },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                            ),
+                            modifier = Modifier.height(28.dp)
+                        )
+                    }
+                }
+            }
             
+            // Tag type only (removed creation date)
             Text(
                 text = "Type: ${tagEntity.type.uppercase()}",
                 fontSize = 14.sp,
@@ -658,12 +698,19 @@ fun PlayingButtons(
     }
 }
 @Composable
-fun EditTagDialog(
-    currentLabel: String,
-    onConfirm: (String) -> Unit,
+fun EnhancedEditTagDialog(
+    currentTag: TagEntity?,
+    onConfirm: (String, String?, List<String>) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var textValue by remember { mutableStateOf(currentLabel) }
+    var titleValue by remember { mutableStateOf(currentTag?.title ?: "") }
+    var descriptionValue by remember { mutableStateOf(currentTag?.description ?: "") }
+    var newGroupText by remember { mutableStateOf("") }
+    var selectedGroups by remember { mutableStateOf(currentTag?.groups?.toSet() ?: emptySet()) }
+    
+    // For demo purposes, some common group suggestions
+    val commonGroups = listOf("Work", "Personal", "Music", "Notes", "Instructions", "Family")
+    val availableGroups = (commonGroups + selectedGroups).distinct().sorted()
     
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -674,28 +721,122 @@ fun EditTagDialog(
             )
         },
         text = {
-            Column {
-                Text(
-                    text = "Enter a new label for this tag:",
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .heightIn(max = 500.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // Title field
                 OutlinedTextField(
-                    value = textValue,
-                    onValueChange = { textValue = it },
-                    label = { Text("Tag Label") },
+                    value = titleValue,
+                    onValueChange = { titleValue = it },
+                    label = { Text("Title *") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                
+                // Description field
+                OutlinedTextField(
+                    value = descriptionValue,
+                    onValueChange = { descriptionValue = it },
+                    label = { Text("Description (optional)") },
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                // Groups section
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Groups:",
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 16.sp
+                    )
+                    
+                    // Selected groups display
+                    if (selectedGroups.isNotEmpty()) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.heightIn(max = 40.dp)
+                        ) {
+                            items(selectedGroups.toList()) { group ->
+                                FilterChip(
+                                    onClick = { selectedGroups = selectedGroups - group },
+                                    label = { Text(group, fontSize = 14.sp) },
+                                    selected = true,
+                                    trailingIcon = {
+                                        Text("×", fontSize = 14.sp)
+                                    },
+                                    modifier = Modifier.height(32.dp)
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Available groups to add
+                    val unselectedGroups = availableGroups.filter { it !in selectedGroups }
+                    if (unselectedGroups.isNotEmpty()) {
+                        Text(
+                            text = "Add group:",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.heightIn(max = 40.dp)
+                        ) {
+                            items(unselectedGroups) { group ->
+                                FilterChip(
+                                    onClick = { selectedGroups = selectedGroups + group },
+                                    label = { Text(group, fontSize = 14.sp) },
+                                    selected = false,
+                                    modifier = Modifier.height(32.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Create new group
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = newGroupText,
+                        onValueChange = { newGroupText = it },
+                        label = { Text("New group") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(
+                        onClick = {
+                            if (newGroupText.trim().isNotEmpty()) {
+                                selectedGroups = selectedGroups + newGroupText.trim()
+                                newGroupText = ""
+                            }
+                        },
+                        enabled = newGroupText.trim().isNotEmpty()
+                    ) {
+                        Text("Add")
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (textValue.trim().isNotEmpty()) {
-                        onConfirm(textValue.trim())
+                    if (titleValue.trim().isNotEmpty()) {
+                        onConfirm(
+                            titleValue.trim(),
+                            descriptionValue.trim().takeIf { it.isNotEmpty() },
+                            selectedGroups.toList()
+                        )
                     }
                 },
-                enabled = textValue.trim().isNotEmpty()
+                enabled = titleValue.trim().isNotEmpty()
             ) {
                 Text("Save")
             }
