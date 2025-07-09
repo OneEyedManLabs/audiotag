@@ -65,6 +65,20 @@
             android:label="My Tags"
             android:theme="@style/Theme.AudioTag" />
             
+        <!-- Settings Activity -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:label="Settings"
+            android:theme="@style/Theme.AudioTag" />
+            
+        <!-- Help Activity -->
+        <activity
+            android:name=".HelpActivity"
+            android:exported="false"
+            android:label="Help"
+            android:theme="@style/Theme.AudioTag" />
+            
         <!-- NFC Dispatch Activity for background NFC scans -->
         <activity
             android:name=".NFCDispatchActivity"

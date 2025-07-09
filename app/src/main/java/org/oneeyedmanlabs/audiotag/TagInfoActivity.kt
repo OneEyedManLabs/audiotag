@@ -105,6 +105,7 @@ class TagInfoActivity : ComponentActivity() {
                         onStopAudio = { stopAudio() },
                         onEditTag = { showEditDialog.value = true },
                         onConfirmEdit = { title, description, groups -> editTag(title, description, groups) },
+                        onRerecord = { rerecordAudio() },
                         onDismissEdit = { showEditDialog.value = false },
                         onClose = { navigateToMain() }
                     )
@@ -314,6 +315,19 @@ class TagInfoActivity : ComponentActivity() {
         }
     }
     
+    private fun rerecordAudio() {
+        val currentTag = tagEntity.value ?: return
+        
+        // Launch recording activity with tag info to preserve metadata
+        val intent = Intent(this, RecordingActivity::class.java).apply {
+            putExtra("rerecord_tag_id", currentTag.tagId)
+            putExtra("rerecord_title", currentTag.title)
+            putExtra("rerecord_description", currentTag.description)
+            putExtra("rerecord_groups", currentTag.groups.toTypedArray())
+        }
+        startActivity(intent)
+    }
+    
     private fun navigateToMain() {
         val mainIntent = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -345,6 +359,7 @@ fun TagInfoScreen(
     onStopAudio: () -> Unit,
     onEditTag: () -> Unit,
     onConfirmEdit: (String, String?, List<String>) -> Unit,
+    onRerecord: () -> Unit,
     onDismissEdit: () -> Unit,
     onClose: () -> Unit
 ) {
@@ -421,6 +436,7 @@ fun TagInfoScreen(
         EnhancedEditTagDialog(
             currentTag = tagEntity,
             onConfirm = onConfirmEdit,
+            onRerecord = onRerecord,
             onDismiss = onDismissEdit
         )
     }
@@ -701,6 +717,7 @@ fun PlayingButtons(
 fun EnhancedEditTagDialog(
     currentTag: TagEntity?,
     onConfirm: (String, String?, List<String>) -> Unit,
+    onRerecord: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var titleValue by remember { mutableStateOf(currentTag?.title ?: "") }
@@ -821,6 +838,25 @@ fun EnhancedEditTagDialog(
                         enabled = newGroupText.trim().isNotEmpty()
                     ) {
                         Text("Add")
+                    }
+                }
+                
+                // Re-record Audio button (for audio tags only)
+                if (currentTag?.type == "audio") {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            onDismiss() // Close dialog first
+                            onRerecord() // Then trigger re-record
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary
+                        )
+                    ) {
+                        Text("🎤", fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Re-record Audio")
                     }
                 }
             }

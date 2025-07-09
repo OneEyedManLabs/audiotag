@@ -52,6 +52,13 @@ class RecordingActivity : ComponentActivity() {
     private var timeRemaining = mutableStateOf(30) // 30 second default
     private var showPermissionDialog = mutableStateOf(false)
     
+    // Re-recording state
+    private var isRerecording = false
+    private var rerecordTagId: String? = null
+    private var rerecordTitle: String? = null
+    private var rerecordDescription: String? = null
+    private var rerecordGroups: List<String>? = null
+    
     // Permission launcher
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -71,11 +78,19 @@ class RecordingActivity : ComponentActivity() {
         ttsService = TTSService(this)
         vibrator = getSystemService(VIBRATOR_SERVICE) as? Vibrator
         
+        // Check if this is a re-recording
+        checkRerecordingIntent()
+        
         // Initialize TTS
         ttsService.initialize {
             Log.d("RecordingActivity", "TTS initialized")
             // Give initial instruction when TTS is ready
-            ttsService.speak("Ready to record. Tap anywhere on the screen to start recording.")
+            val message = if (isRerecording) {
+                "Ready to re-record. Tap anywhere on the screen to start recording."
+            } else {
+                "Ready to record. Tap anywhere on the screen to start recording."
+            }
+            ttsService.speak(message)
         }
         
         setContent {
@@ -98,6 +113,19 @@ class RecordingActivity : ComponentActivity() {
         }
     }
     
+    private fun checkRerecordingIntent() {
+        rerecordTagId = intent.getStringExtra("rerecord_tag_id")
+        rerecordTitle = intent.getStringExtra("rerecord_title")
+        rerecordDescription = intent.getStringExtra("rerecord_description")
+        rerecordGroups = intent.getStringArrayExtra("rerecord_groups")?.toList()
+        
+        isRerecording = rerecordTagId != null
+        
+        if (isRerecording) {
+            Log.d("RecordingActivity", "Re-recording mode for tag: $rerecordTagId")
+        }
+    }
+    
     private fun checkPermissionAndStart() {
         when {
             ContextCompat.checkSelfPermission(
@@ -113,13 +141,18 @@ class RecordingActivity : ComponentActivity() {
     
     private fun startCountdown() {
         recordingState.value = RecordingState.COUNTDOWN
-        ttsService.speak("Get ready. When recording starts, tap anywhere on the screen to finish. Recording in 3, 2, 1")
+        ttsService.speak("Get ready. When recording starts, tap anywhere on the screen to finish. Recording in beep beep beeeep")
         
-        // Start countdown after TTS
+        // Start countdown after TTS - adjust timing based on TTS setting
         lifecycleScope.launch {
-            delay(5000) // Wait longer for the full TTS message
+            val ttsEnabled = SettingsActivity.getTTSEnabled(this@RecordingActivity)
+            if (ttsEnabled) {
+                delay(5000) // Wait for the full TTS message
+            } else {
+                delay(1000) // Much shorter delay when TTS is disabled
+            }
             playBeeps(3) // Countdown beeps
-            delay(2500) // Longer delay to ensure "one" is completely finished
+            delay(2500) // Longer delay to ensure beeps are completely finished
             startRecording()
         }
     }
@@ -165,14 +198,59 @@ class RecordingActivity : ComponentActivity() {
             vibrator?.vibrate(200) // Completion haptic
             playBeeps(2) // Success beeps
             
-            // Launch NFC writing activity
-            val intent = Intent(this, NFCWritingActivity::class.java).apply {
-                putExtra("audio_file_path", recordedFilePath)
+            if (isRerecording) {
+                // Handle re-recording - update existing tag directly
+                handleRerecording()
+            } else {
+                // Launch NFC writing activity for new recording
+                val intent = Intent(this, NFCWritingActivity::class.java).apply {
+                    putExtra("audio_file_path", recordedFilePath)
+                }
+                startActivity(intent)
             }
-            startActivity(intent)
         } else {
             recordingState.value = RecordingState.ERROR
             ttsService.speak("Failed to save recording")
+        }
+    }
+    
+    private fun handleRerecording() {
+        lifecycleScope.launch {
+            try {
+                val application = application as AudioTaggerApplication
+                val repository = application.repository
+                
+                // Get the existing tag
+                val existingTag = repository.getTag(rerecordTagId!!)
+                if (existingTag != null) {
+                    // Update the existing tag with new audio content, preserving all other metadata
+                    val updatedTag = existingTag.copy(
+                        content = recordedFilePath!!,
+                        title = rerecordTitle ?: existingTag.title,
+                        description = rerecordDescription ?: existingTag.description,
+                        groups = rerecordGroups ?: existingTag.groups,
+                        createdAt = System.currentTimeMillis() // Update timestamp
+                    )
+                    
+                    // Save the updated tag
+                    repository.updateTag(updatedTag)
+                    
+                    Log.d("RecordingActivity", "Re-recording completed for tag: ${rerecordTagId}")
+                    ttsService.speak("Re-recording completed successfully.")
+                    
+                    // Close this activity after a brief delay
+                    delay(2000)
+                    finish()
+                } else {
+                    Log.e("RecordingActivity", "Original tag not found for re-recording: $rerecordTagId")
+                    ttsService.speak("Error: Original tag not found")
+                    finish()
+                }
+            } catch (e: Exception) {
+                Log.e("RecordingActivity", "Error during re-recording", e)
+                ttsService.speak("Error during re-recording")
+                finish()
+            }
         }
     }
     
