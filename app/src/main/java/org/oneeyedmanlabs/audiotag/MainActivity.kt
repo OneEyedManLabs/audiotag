@@ -53,7 +53,10 @@ class MainActivity : ComponentActivity() {
                             startActivity(Intent(this@MainActivity, TagListActivity::class.java))
                         },
                         onSettings = {
-                            // TODO: Launch SettingsActivity
+                            startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
+                        },
+                        onHelp = {
+                            startActivity(Intent(this@MainActivity, HelpActivity::class.java))
                         }
                     )
                 }
@@ -119,7 +122,8 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(
     onRecordAudio: () -> Unit = {},
     onMyTags: () -> Unit = {},
-    onSettings: () -> Unit = {}
+    onSettings: () -> Unit = {},
+    onHelp: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -196,6 +200,19 @@ fun MainScreen(
             ) {
                 Text(
                     text = "⚙️ Settings",
+                    fontSize = 18.sp
+                )
+            }
+            
+            // Help Button
+            OutlinedButton(
+                onClick = onHelp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+            ) {
+                Text(
+                    text = "❓ Help",
                     fontSize = 18.sp
                 )
             }
