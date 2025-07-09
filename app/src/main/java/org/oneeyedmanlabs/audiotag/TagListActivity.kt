@@ -14,7 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -470,7 +470,7 @@ fun TagListItem(
                     )
                 ) {
                     Icon(
-                        imageVector = if (isPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
+                        imageVector = if (isPlaying) Icons.Default.Close else Icons.Default.PlayArrow,
                         contentDescription = if (isPlaying) "Stop" else "Play",
                         modifier = Modifier.size(24.dp)
                     )
