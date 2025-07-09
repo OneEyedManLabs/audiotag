@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- NFC permissions -->
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature android:name="android.hardware.nfc" android:required="true" />
+    
+    <!-- Audio permissions -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    
+    <!-- Vibration for haptic feedback -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <application
+        android:name=".service.AudioTaggerApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AudioTag">
+        
+        <!-- Main Activity - Clean slate for new implementation -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.AudioTag">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        
+        <!-- Recording Activity -->
+        <activity
+            android:name=".RecordingActivity"
+            android:exported="false"
+            android:label="Record Audio Tag"
+            android:theme="@style/Theme.AudioTag" />
+            
+        <!-- NFC Writing Activity -->
+        <activity
+            android:name=".NFCWritingActivity"
+            android:exported="false"
+            android:label="Save Audio Tag"
+            android:theme="@style/Theme.AudioTag"
+            android:launchMode="singleTop" />
+            
+        <!-- Tag Info Activity -->
+        <activity
+            android:name=".TagInfoActivity"
+            android:exported="false"
+            android:label="Audio Tag Info"
+            android:theme="@style/Theme.AudioTag"
+            android:launchMode="singleTop" />
+            
+        <!-- Tag List Activity -->
+        <activity
+            android:name=".TagListActivity"
+            android:exported="false"
+            android:label="My Tags"
+            android:theme="@style/Theme.AudioTag" />
+            
+        <!-- NFC Dispatch Activity for background NFC scans -->
+        <activity
+            android:name=".NFCDispatchActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop">
+            
+            <!-- Specific NFC intent filters for AudioTagger tags -->
+            <intent-filter android:priority="500">
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            
+            <!-- Fallback for tags without NDEF data -->
+            <intent-filter android:priority="100">
+                <action android:name="android.nfc.action.TAG_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            
+            <meta-data 
+                android:name="android.nfc.action.TECH_DISCOVERED"
+                android:resource="@xml/nfc_tech_filter" />
+        </activity>
+        
+    </application>
+
+</manifest>
