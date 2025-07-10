@@ -42,6 +42,13 @@
             android:label="Record Audio Tag"
             android:theme="@style/Theme.AudioTag" />
             
+        <!-- Text Tag Activity -->
+        <activity
+            android:name=".TextTagActivity"
+            android:exported="false"
+            android:label="Create Text Tag"
+            android:theme="@style/Theme.AudioTag" />
+            
         <!-- NFC Writing Activity -->
         <activity
             android:name=".NFCWritingActivity"
@@ -78,6 +85,17 @@
             android:exported="false"
             android:label="Help"
             android:theme="@style/Theme.AudioTag" />
+            
+        <!-- File Provider for sharing exports -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="org.oneeyedmanlabs.audiotag.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
             
         <!-- NFC Dispatch Activity for background NFC scans -->
         <activity

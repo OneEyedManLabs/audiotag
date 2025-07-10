@@ -1,19 +1,32 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   AudioTagger data extraction rules for Android 12+
+   Smart backup: includes database, settings, and small audio files only
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <!-- Include app preferences/settings -->
+        <include domain="sharedpref" path="."/>
+        
+        <!-- Include database files -->
+        <include domain="database" path="."/>
+        
+        <!-- Include small audio files only -->
+        <include domain="file" path="audio_small/"/>
+        
+        <!-- Exclude large audio files -->
+        <exclude domain="file" path="audio_large/"/>
+        
+        <!-- Exclude temporary and cache files -->
+        <exclude domain="file" path="temp/"/>
+        <exclude domain="cache" path="."/>
     </cloud-backup>
-    <!--
+    
+    <!-- Device-to-device transfer can include everything -->
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <include domain="sharedpref" path="."/>
+        <include domain="database" path="."/>
+        <include domain="file" path="."/>
+        <exclude domain="cache" path="."/>
     </device-transfer>
-    -->
 </data-extraction-rules>

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -29,14 +30,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.oneeyedmanlabs.audiotag.data.TagEntity
 import org.oneeyedmanlabs.audiotag.repository.TagRepository
 import org.oneeyedmanlabs.audiotag.service.AudioTaggerApplication
+import org.oneeyedmanlabs.audiotag.service.ExportService
 import org.oneeyedmanlabs.audiotag.service.TTSService
 import org.oneeyedmanlabs.audiotag.ui.theme.AudioTagTheme
+import org.oneeyedmanlabs.audiotag.ui.theme.ThemeManager
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -49,6 +54,7 @@ class TagListActivity : ComponentActivity() {
     
     private lateinit var repository: TagRepository
     private lateinit var ttsService: TTSService
+    private lateinit var exportService: ExportService
     private var vibrator: Vibrator? = null
     private var mediaPlayer: MediaPlayer? = null
     
@@ -58,6 +64,8 @@ class TagListActivity : ComponentActivity() {
     private var showDeleteDialog = mutableStateOf<TagEntity?>(null)
     private var currentlyPlayingTag = mutableStateOf<String?>(null)
     private var selectedGroup = mutableStateOf<String?>(null)
+    private var showExportDialog = mutableStateOf(false)
+    private var isExporting = mutableStateOf(false)
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,6 +74,7 @@ class TagListActivity : ComponentActivity() {
         val application = application as AudioTaggerApplication
         repository = application.repository
         ttsService = TTSService(this)
+        exportService = application.exportService
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
         
         // Initialize TTS
@@ -77,7 +86,8 @@ class TagListActivity : ComponentActivity() {
         loadTags()
         
         setContent {
-            AudioTagTheme {
+            val currentTheme by ThemeManager.getCurrentThemeState()
+            AudioTagTheme(themeOption = currentTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -89,6 +99,8 @@ class TagListActivity : ComponentActivity() {
                         showDeleteDialog = showDeleteDialog.value,
                         currentlyPlayingTag = currentlyPlayingTag.value,
                         selectedGroup = selectedGroup.value,
+                        showExportDialog = showExportDialog.value,
+                        isExporting = isExporting.value,
                         onPlayTag = { tag -> playTag(tag) },
                         onStopTag = { tag -> stopTag(tag) },
                         onCardClick = { tag -> openTagInfo(tag) },
@@ -96,6 +108,9 @@ class TagListActivity : ComponentActivity() {
                         onConfirmDelete = { tag -> deleteTag(tag) },
                         onDismissDeleteDialog = { showDeleteDialog.value = null },
                         onGroupFilter = { group -> filterByGroup(group) },
+                        onExportGroup = { showExportDialog.value = true },
+                        onDismissExportDialog = { showExportDialog.value = false },
+                        onConfirmExport = { confirmExport() },
                         onBack = { finish() }
                     )
                 }
@@ -263,6 +278,67 @@ class TagListActivity : ComponentActivity() {
         }
     }
     
+    private fun confirmExport() {
+        lifecycleScope.launch {
+            try {
+                isExporting.value = true
+                showExportDialog.value = false
+                
+                val currentTags = tags.value
+                val groupToExport = selectedGroup.value
+                
+                val (options, shareTitle, description) = if (groupToExport != null) {
+                    // Export specific group
+                    ttsService.speak("Exporting $groupToExport group")
+                    Triple(
+                        ExportService.ExportOptions(
+                            type = ExportService.ExportType.GROUP_EXPORT,
+                            selectedGroups = setOf(groupToExport),
+                            includeSettings = false,
+                            includeAllAudio = true
+                        ),
+                        "Share $groupToExport Tags",
+                        "$groupToExport group"
+                    )
+                } else {
+                    // Export all currently visible tags
+                    ttsService.speak("Exporting visible tags")
+                    Triple(
+                        ExportService.ExportOptions(
+                            type = ExportService.ExportType.VISIBLE_TAGS,
+                            specificTags = currentTags,
+                            includeSettings = false,
+                            includeAllAudio = true
+                        ),
+                        "Share Tags",
+                        "visible tags"
+                    )
+                }
+                
+                val result = exportService.createExport(options)
+                
+                if (result.success) {
+                    val shareIntent = exportService.shareExport(result, shareTitle)
+                    if (shareIntent != null) {
+                        ttsService.speak("Export complete. ${result.tagCount} tags exported. Opening share menu.")
+                        startActivity(Intent.createChooser(shareIntent, shareTitle))
+                    } else {
+                        ttsService.speak("Export created but sharing failed")
+                    }
+                } else {
+                    ttsService.speak("Export failed: ${result.errorMessage}")
+                    Log.e("TagListActivity", "Export failed: ${result.errorMessage}")
+                }
+                
+            } catch (e: Exception) {
+                Log.e("TagListActivity", "Export error", e)
+                ttsService.speak("Export error occurred")
+            } finally {
+                isExporting.value = false
+            }
+        }
+    }
+    
     override fun onDestroy() {
         super.onDestroy()
         stopAllAudio()
@@ -278,6 +354,8 @@ fun TagListScreen(
     showDeleteDialog: TagEntity?,
     currentlyPlayingTag: String?,
     selectedGroup: String?,
+    showExportDialog: Boolean,
+    isExporting: Boolean,
     onPlayTag: (TagEntity) -> Unit,
     onStopTag: (TagEntity) -> Unit,
     onCardClick: (TagEntity) -> Unit,
@@ -285,6 +363,9 @@ fun TagListScreen(
     onConfirmDelete: (TagEntity) -> Unit,
     onDismissDeleteDialog: () -> Unit,
     onGroupFilter: (String?) -> Unit,
+    onExportGroup: () -> Unit,
+    onDismissExportDialog: () -> Unit,
+    onConfirmExport: () -> Unit,
     onBack: () -> Unit
 ) {
     Column(
@@ -297,7 +378,7 @@ fun TagListScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 24.dp),
+                .padding(bottom = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -320,6 +401,49 @@ fun TagListScreen(
             )
             
             Spacer(modifier = Modifier.width(60.dp)) // Balance the back button
+        }
+        
+        // Export/Share section
+        if (tags.isNotEmpty() && !isLoading) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Button(
+                    onClick = onExportGroup,
+                    enabled = !isExporting,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    ),
+                    modifier = Modifier
+                        .height(48.dp)
+                        .semantics { contentDescription = "Export and share displayed tags" }
+                ) {
+                    if (isExporting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = MaterialTheme.colorScheme.onSecondary,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Exporting...",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    } else {
+                        Text("📤", fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Export/Share",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
         }
         
         // Group filter
@@ -361,6 +485,16 @@ fun TagListScreen(
             tag = showDeleteDialog,
             onConfirm = { onConfirmDelete(showDeleteDialog) },
             onDismiss = onDismissDeleteDialog
+        )
+    }
+    
+    // Export confirmation dialog
+    if (showExportDialog) {
+        ExportGroupDialog(
+            groupName = selectedGroup,
+            tagCount = tags.size,
+            onConfirm = onConfirmExport,
+            onDismiss = onDismissExportDialog
         )
     }
 }
@@ -638,6 +772,48 @@ fun DeleteTagDialog(
                 )
             ) {
                 Text("Delete")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun ExportGroupDialog(
+    groupName: String?,
+    tagCount: Int,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = if (groupName != null) "Export Group" else "Export Tags",
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Text(
+                text = if (groupName != null) {
+                    "Export all tags in the \"$groupName\" group? This will create a shareable file containing all audio files and metadata from this group."
+                } else {
+                    "Export all $tagCount visible tags? This will create a shareable file containing all audio files and metadata from the currently displayed tags."
+                }
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text("Export")
             }
         },
         dismissButton = {

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -38,6 +39,7 @@ import org.oneeyedmanlabs.audiotag.service.AudioTaggerApplication
 import org.oneeyedmanlabs.audiotag.service.NFCService
 import org.oneeyedmanlabs.audiotag.service.TTSService
 import org.oneeyedmanlabs.audiotag.ui.theme.AudioTagTheme
+import org.oneeyedmanlabs.audiotag.ui.theme.ThemeManager
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -100,7 +102,8 @@ class TagInfoActivity : ComponentActivity() {
         handleIntent(intent)
         
         setContent {
-            AudioTagTheme {
+            val currentTheme by ThemeManager.getCurrentThemeState()
+            AudioTagTheme(themeOption = currentTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

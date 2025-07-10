@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +42,7 @@ import org.oneeyedmanlabs.audiotag.service.AudioRecordingService
 import org.oneeyedmanlabs.audiotag.service.AudioTaggerApplication
 import org.oneeyedmanlabs.audiotag.service.TTSService
 import org.oneeyedmanlabs.audiotag.ui.theme.AudioTagTheme
+import org.oneeyedmanlabs.audiotag.ui.theme.ThemeManager
 
 /**
  * Clean, accessible recording activity
@@ -106,7 +108,8 @@ class RecordingActivity : ComponentActivity() {
         }
         
         setContent {
-            AudioTagTheme {
+            val currentTheme by ThemeManager.getCurrentThemeState()
+            AudioTagTheme(themeOption = currentTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
