@@ -35,6 +35,7 @@ class SettingsActivity : ComponentActivity() {
     companion object {
         const val PREFS_NAME = "AudioTagSettings"
         const val PREF_TTS_ENABLED = "tts_enabled"
+        const val PREF_AUTO_TITLE_ENABLED = "auto_title_enabled"
         
         fun getTTSEnabled(context: Context): Boolean {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -44,6 +45,16 @@ class SettingsActivity : ComponentActivity() {
         fun setTTSEnabled(context: Context, enabled: Boolean) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.edit().putBoolean(PREF_TTS_ENABLED, enabled).apply()
+        }
+        
+        fun getAutoTitleEnabled(context: Context): Boolean {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            return prefs.getBoolean(PREF_AUTO_TITLE_ENABLED, true) // Default to enabled
+        }
+        
+        fun setAutoTitleEnabled(context: Context, enabled: Boolean) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putBoolean(PREF_AUTO_TITLE_ENABLED, enabled).apply()
         }
     }
     
@@ -83,6 +94,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     var ttsEnabled by remember { mutableStateOf(SettingsActivity.getTTSEnabled(context)) }
+    var autoTitleEnabled by remember { mutableStateOf(SettingsActivity.getAutoTitleEnabled(context)) }
     
     Column(
         modifier = Modifier
@@ -139,6 +151,23 @@ fun SettingsScreen(
                         // Provide TTS confirmation when enabling
                         if (enabled) {
                             ttsService.speak("Voice instructions enabled")
+                        }
+                    }
+                )
+            }
+            
+            // Recording section
+            SettingsSection(title = "Recording") {
+                // Auto Title Generation Toggle
+                SettingsToggleItem(
+                    title = "Auto-Generate Titles",
+                    description = "Automatically create tag titles from recorded audio using speech recognition",
+                    checked = autoTitleEnabled,
+                    onCheckedChange = { enabled ->
+                        autoTitleEnabled = enabled
+                        SettingsActivity.setAutoTitleEnabled(context, enabled)
+                        if (enabled && ttsEnabled) {
+                            ttsService.speak("Auto-generate titles enabled")
                         }
                     }
                 )
