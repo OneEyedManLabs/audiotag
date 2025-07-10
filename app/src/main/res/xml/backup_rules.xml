@@ -1,13 +1,23 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+   AudioTagger backup rules for Android Auto Backup
+   Includes: database, settings, small audio files (<1MB)
+   Excludes: large audio files (>1MB) - use manual export instead
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <!-- Include app preferences/settings -->
+    <include domain="sharedpref" path="."/>
+    
+    <!-- Include database files -->
+    <include domain="database" path="."/>
+    
+    <!-- Include small audio files only (under 1MB to stay within 25MB limit) -->
+    <include domain="file" path="audio_small/"/>
+    
+    <!-- Exclude large audio files - these need manual export -->
+    <exclude domain="file" path="audio_large/"/>
+    
+    <!-- Exclude temporary and cache files -->
+    <exclude domain="file" path="temp/"/>
+    <exclude domain="cache" path="."/>
 </full-backup-content>

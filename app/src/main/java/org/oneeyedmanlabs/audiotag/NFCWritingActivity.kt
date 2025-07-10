@@ -14,6 +14,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -26,10 +27,12 @@ import kotlinx.coroutines.launch
 import org.oneeyedmanlabs.audiotag.data.TagEntity
 import org.oneeyedmanlabs.audiotag.repository.TagRepository
 import org.oneeyedmanlabs.audiotag.service.AudioTaggerApplication
+import org.oneeyedmanlabs.audiotag.service.BackupService
 import org.oneeyedmanlabs.audiotag.service.NFCService
 import org.oneeyedmanlabs.audiotag.service.NFCWriteService
 import org.oneeyedmanlabs.audiotag.service.TTSService
 import org.oneeyedmanlabs.audiotag.ui.theme.AudioTagTheme
+import org.oneeyedmanlabs.audiotag.ui.theme.ThemeManager
 import java.io.File
 
 /**
@@ -42,21 +45,34 @@ class NFCWritingActivity : ComponentActivity() {
     private lateinit var nfcService: NFCService
     private lateinit var nfcWriteService: NFCWriteService
     private lateinit var ttsService: TTSService
+    private lateinit var backupService: BackupService
     private var vibrator: Vibrator? = null
     private var nfcAdapter: NfcAdapter? = null
     
     // State
     private var writingState = mutableStateOf(WritingState.WAITING_FOR_TAG)
     private var audioFilePath: String? = null
+    private var textContent: String? = null
+    private var tagTitle: String? = null
+    private var tagDescription: String? = null
+    private var tagGroups: List<String>? = null
     private var tagId: String? = null
+    private var isTextTag: Boolean = false
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Get audio file path from intent
+        // Get content from intent - either audio file or text content
         audioFilePath = intent.getStringExtra("audio_file_path")
-        if (audioFilePath == null) {
-            Log.e("NFCWritingActivity", "No audio file path provided")
+        textContent = intent.getStringExtra("text_content")
+        tagTitle = intent.getStringExtra("tag_title")
+        tagDescription = intent.getStringExtra("tag_description")
+        tagGroups = intent.getStringArrayExtra("tag_groups")?.toList()
+        
+        isTextTag = textContent != null
+        
+        if (audioFilePath == null && textContent == null) {
+            Log.e("NFCWritingActivity", "No audio file path or text content provided")
             finish()
             return
         }
@@ -67,6 +83,7 @@ class NFCWritingActivity : ComponentActivity() {
         nfcService = NFCService()
         nfcWriteService = NFCWriteService()
         ttsService = TTSService(this)
+        backupService = application.backupService
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
         
         // Initialize NFC
@@ -78,11 +95,17 @@ class NFCWritingActivity : ComponentActivity() {
         
         // Initialize TTS
         ttsService.initialize {
-            ttsService.speak("Recording saved. Now scan your NFC tag to associate it with this audio.")
+            val message = if (isTextTag) {
+                "Text tag created. Now scan your NFC tag to save it."
+            } else {
+                "Recording saved. Now scan your NFC tag to associate it with this audio."
+            }
+            ttsService.speak(message)
         }
         
         setContent {
-            AudioTagTheme {
+            val currentTheme by ThemeManager.getCurrentThemeState()
+            AudioTagTheme(themeOption = currentTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -167,37 +190,76 @@ class NFCWritingActivity : ComponentActivity() {
             try {
                 // Generate tag ID and label
                 tagId = nfcService.getTagId(tag)
-                val generatedLabel = "Audio Tag ${System.currentTimeMillis() % 10000}"
+                val generatedLabel = if (isTextTag) {
+                    tagTitle ?: "Text Tag ${System.currentTimeMillis() % 10000}"
+                } else {
+                    "Audio Tag ${System.currentTimeMillis() % 10000}"
+                }
                 
-                // Verify audio file exists
-                val audioFile = File(audioFilePath!!)
-                if (!audioFile.exists()) {
-                    Log.e("NFCWritingActivity", "Audio file not found: $audioFilePath")
-                    writingState.value = WritingState.ERROR
-                    ttsService.speak("Error: Audio file not found")
-                    return@launch
+                // Verify content exists
+                if (isTextTag) {
+                    if (textContent.isNullOrBlank()) {
+                        Log.e("NFCWritingActivity", "Text content is empty")
+                        writingState.value = WritingState.ERROR
+                        ttsService.speak("Error: Text content is empty")
+                        return@launch
+                    }
+                } else {
+                    val audioFile = File(audioFilePath!!)
+                    if (!audioFile.exists()) {
+                        Log.e("NFCWritingActivity", "Audio file not found: $audioFilePath")
+                        writingState.value = WritingState.ERROR
+                        ttsService.speak("Error: Audio file not found")
+                        return@launch
+                    }
+                    
+                    // Categorize audio file for smart backup
+                    audioFilePath = backupService.handleNewAudioFile(audioFilePath!!)
                 }
                 
                 // Check if tag already exists
                 val existingTag = repository.getTag(tagId!!)
                 
                 val tagEntity = if (existingTag != null) {
-                    // Update existing tag with new audio content
-                    existingTag.copy(
-                        content = audioFilePath!!,
-                        createdAt = System.currentTimeMillis() // Update timestamp
-                    )
+                    // Update existing tag with new content
+                    if (isTextTag) {
+                        existingTag.copy(
+                            type = "tts",
+                            content = textContent!!,
+                            title = tagTitle ?: existingTag.title,
+                            description = tagDescription ?: existingTag.description,
+                            groups = tagGroups ?: existingTag.groups,
+                            createdAt = System.currentTimeMillis()
+                        )
+                    } else {
+                        existingTag.copy(
+                            content = audioFilePath!!,
+                            createdAt = System.currentTimeMillis()
+                        )
+                    }
                 } else {
                     // Create new tag entity
-                    TagEntity(
-                        tagId = tagId!!,
-                        type = "audio",
-                        content = audioFilePath!!,
-                        title = generatedLabel,
-                        description = null,
-                        groups = emptyList(),
-                        createdAt = System.currentTimeMillis()
-                    )
+                    if (isTextTag) {
+                        TagEntity(
+                            tagId = tagId!!,
+                            type = "tts",
+                            content = textContent!!,
+                            title = generatedLabel,
+                            description = tagDescription,
+                            groups = tagGroups ?: emptyList(),
+                            createdAt = System.currentTimeMillis()
+                        )
+                    } else {
+                        TagEntity(
+                            tagId = tagId!!,
+                            type = "audio",
+                            content = audioFilePath!!,
+                            title = generatedLabel,
+                            description = null,
+                            groups = emptyList(),
+                            createdAt = System.currentTimeMillis()
+                        )
+                    }
                 }
                 
                 // Save to database (upsert)
@@ -210,7 +272,12 @@ class NFCWritingActivity : ComponentActivity() {
                 if (writeSuccess) {
                     Log.d("NFCWritingActivity", "NFC write successful")
                     writingState.value = WritingState.SUCCESS
-                    ttsService.speak("Success! Audio tag saved. You can now scan this tag to play your recording.")
+                    val successMessage = if (isTextTag) {
+                        "Success! Text tag saved. You can now scan this tag to hear your message."
+                    } else {
+                        "Success! Audio tag saved. You can now scan this tag to play your recording."
+                    }
+                    ttsService.speak(successMessage)
                     
                     // Give TTS more time to finish, then go to TagInfoActivity
                     delay(5000) // Increased from 3000

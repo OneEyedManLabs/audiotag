@@ -14,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -22,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.oneeyedmanlabs.audiotag.service.NFCService
 import org.oneeyedmanlabs.audiotag.ui.theme.AudioTagTheme
+import org.oneeyedmanlabs.audiotag.ui.theme.ThemeManager
+import org.oneeyedmanlabs.audiotag.ui.theme.ThemeOption
 
 /**
  * Clean slate MainActivity for AudioTagger V2
@@ -42,7 +45,8 @@ class MainActivity : ComponentActivity() {
         setupNFC()
         
         setContent {
-            AudioTagTheme {
+            val currentTheme by ThemeManager.getCurrentThemeState()
+            AudioTagTheme(themeOption = currentTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -50,6 +54,9 @@ class MainActivity : ComponentActivity() {
                     MainScreen(
                         onRecordAudio = {
                             startActivity(Intent(this@MainActivity, RecordingActivity::class.java))
+                        },
+                        onCreateTextTag = {
+                            startActivity(Intent(this@MainActivity, TextTagActivity::class.java))
                         },
                         onMyTags = {
                             startActivity(Intent(this@MainActivity, TagListActivity::class.java))
@@ -123,6 +130,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen(
     onRecordAudio: () -> Unit = {},
+    onCreateTextTag: () -> Unit = {},
     onMyTags: () -> Unit = {},
     onSettings: () -> Unit = {},
     onHelp: () -> Unit = {}
@@ -145,7 +153,7 @@ fun MainScreen(
         )
         
         Text(
-            text = "Label your world with audio",
+            text = "Label your world with audio or text",
             fontSize = 18.sp,
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -177,15 +185,33 @@ fun MainScreen(
                 )
             }
             
+            // Create Text Tag Button
+            Button(
+                onClick = onCreateTextTag,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(72.dp)
+                    .semantics { contentDescription = "Create new text tag using typed message. Tap to start." },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
+                )
+            ) {
+                Text(
+                    text = "💬 Create Text Tag",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            
             // My Tags Button  
             Button(
                 onClick = onMyTags,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(72.dp)
-                    .semantics { contentDescription = "View and manage saved audio tags" },
+                    .semantics { contentDescription = "View and manage saved audio and text tags" },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary
+                    containerColor = MaterialTheme.colorScheme.tertiary
                 )
             ) {
                 Text(
@@ -230,8 +256,9 @@ fun MainScreen(
         Text(
             text = "Ready to create audio tags",
             fontSize = 16.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),
+            textAlign = TextAlign.Center,
+            fontWeight = FontWeight.Medium
         )
     }
 }

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -18,6 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.oneeyedmanlabs.audiotag.ui.theme.AudioTagTheme
+import org.oneeyedmanlabs.audiotag.ui.theme.ThemeManager
 
 /**
  * Help screen providing usage instructions and creative use cases for AudioTagger
@@ -28,7 +30,8 @@ class HelpActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         
         setContent {
-            AudioTagTheme {
+            val currentTheme by ThemeManager.getCurrentThemeState()
+            AudioTagTheme(themeOption = currentTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -92,16 +95,20 @@ fun HelpScreen(
             // Getting Started section
             HelpSection(title = "Getting Started", icon = "🚀") {
                 HelpCard(
-                    title = "1. Record Audio",
-                    description = "Tap 'Record Audio' to create a new audio tag. Follow the voice prompts to record your message."
+                    title = "1. Choose Content Type",
+                    description = "Choose 'Record Audio' to record your voice, or 'Create Text Tag' to type a message that will be read aloud using text-to-speech."
                 )
                 HelpCard(
-                    title = "2. Write to NFC Tag",
-                    description = "After recording, hold your phone near an NFC tag to save the audio to it."
+                    title = "2. Create Content",
+                    description = "For audio: Follow voice prompts to record. For text: Type your message, add a title, and tap Preview to test how it sounds."
                 )
                 HelpCard(
-                    title = "3. Play Back",
-                    description = "Tap the NFC tag with your phone to instantly play the audio message."
+                    title = "3. Write to NFC Tag",
+                    description = "After creating content, hold your phone near an NFC tag to save it."
+                )
+                HelpCard(
+                    title = "4. Play Back",
+                    description = "Tap the NFC tag with your phone to play recorded audio or hear your typed text spoken aloud using text-to-speech."
                 )
             }
             
@@ -109,11 +116,15 @@ fun HelpScreen(
             HelpSection(title = "Features", icon = "✨") {
                 HelpCard(
                     title = "Tag Management",
-                    description = "View all your audio tags in 'My Tags'. Edit titles, descriptions, and organize with groups."
+                    description = "View all your audio and text tags in 'My Tags'. Edit titles, descriptions, and organize with groups."
                 )
                 HelpCard(
                     title = "Group Filtering",
                     description = "Create groups to organize your tags and filter by group in the tag list."
+                )
+                HelpCard(
+                    title = "Text Tags",
+                    description = "Type messages that are spoken using your device's text-to-speech engine. Perfect for those who prefer not to record their voice or for consistent pronunciation."
                 )
                 HelpCard(
                     title = "Re-record Audio",
@@ -248,7 +259,7 @@ fun HelpCard(
             Text(
                 text = description,
                 fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),
                 lineHeight = 20.sp
             )
         }
