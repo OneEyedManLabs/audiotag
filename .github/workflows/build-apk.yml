@@ -1,0 +1,94 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+        - debug
+        - release
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'adopt'
+        
+    - name: Cache Gradle packages
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+      
+    - name: Build APK
+      run: |
+        if [ "${{ github.event.inputs.build_type }}" == "release" ] || [ "${{ github.event_name }}" == "push" ]; then
+          ./gradlew assembleRelease
+          BUILD_TYPE="release"
+        else
+          ./gradlew assembleDebug
+          BUILD_TYPE="debug"
+        fi
+        echo "BUILD_TYPE=$BUILD_TYPE" >> $GITHUB_ENV
+        
+    - name: Get version info
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" == "push" ]; then
+          VERSION=${GITHUB_REF#refs/tags/}
+        else
+          VERSION="manual-build-$(date +%Y%m%d-%H%M)"
+        fi
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        
+    - name: Rename APK
+      run: |
+        BUILD_TYPE=${{ env.BUILD_TYPE }}
+        VERSION=${{ steps.version.outputs.VERSION }}
+        cd app/build/outputs/apk/$BUILD_TYPE
+        for apk in *.apk; do
+          if [ -f "$apk" ]; then
+            new_name="AudioTag-$VERSION-$BUILD_TYPE.apk"
+            mv "$apk" "$new_name"
+            echo "Renamed $apk to $new_name"
+          fi
+        done
+        
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: AudioTag-${{ steps.version.outputs.VERSION }}-${{ env.BUILD_TYPE }}
+        path: app/build/outputs/apk/${{ env.BUILD_TYPE }}/*.apk
+        
+    - name: Create Release (for tags)
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: app/build/outputs/apk/${{ env.BUILD_TYPE }}/*.apk
+        draft: false
+        prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

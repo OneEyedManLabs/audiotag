@@ -49,10 +49,12 @@ AudioTag is an Android app that lets you record audio messages and associate the
 - NFC tags (NTAG213, NTAG215, NTAG216 recommended)
 
 ### Installation
-1. Download the APK from the [Releases](https://github.com/oneeyedmanlabs/audiotag/releases) page
+1. Download the APK from the [Releases](https://github.com/OneEyedManLabs/audiotag/releases) page
 2. Enable "Install from Unknown Sources" in your device settings
 3. Install the APK file
 4. Grant necessary permissions (NFC, Audio Recording, Vibration)
+
+> **🤖 Automated Builds**: APKs are automatically built and tested using GitHub Actions for every release. See [Automated Builds Guide](.github/AUTOMATED_BUILDS.md) for details.
 
 ### First Use
 1. **Enable NFC** on your device (Settings > Connected devices > NFC)
