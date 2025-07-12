@@ -86,6 +86,14 @@
             android:label="Help"
             android:theme="@style/Theme.AudioTag" />
             
+        <!-- Unknown Tag Activity -->
+        <activity
+            android:name=".UnknownTagActivity"
+            android:exported="false"
+            android:label="Unknown NFC Tag"
+            android:theme="@style/Theme.AudioTag"
+            android:launchMode="singleTop" />
+            
         <!-- File Provider for sharing exports -->
         <provider
             android:name="androidx.core.content.FileProvider"
