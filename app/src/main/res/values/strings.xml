@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">AudioTag</string>
+    <string name="developer_name">One Eyed Man Labs</string>
+    <string name="support_email">support@oneeyedmanlabs.org</string>
+    <string name="contact_email">contact@oneeyedmanlabs.org</string>
+    <string name="privacy_email">privacy@oneeyedmanlabs.org</string>
+    <string name="website_url">https://oneeyedmanlabs.org</string>
 </resources>

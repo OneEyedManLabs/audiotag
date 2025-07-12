@@ -68,6 +68,10 @@ class RecordingActivity : ComponentActivity() {
     private var rerecordDescription: String? = null
     private var rerecordGroups: List<String>? = null
     
+    // Unknown tag state
+    private var unknownTagId: String? = null
+    private var isFromUnknownTag = false
+    
     // Permission launcher
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -92,8 +96,8 @@ class RecordingActivity : ComponentActivity() {
             getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
         }
         
-        // Check if this is a re-recording
-        checkRerecordingIntent()
+        // Check if this is a re-recording or unknown tag recording
+        checkIntentType()
         
         // Initialize TTS
         ttsService.initialize {
@@ -128,13 +132,17 @@ class RecordingActivity : ComponentActivity() {
         }
     }
     
-    private fun checkRerecordingIntent() {
+    private fun checkIntentType() {
+        // Check for re-recording
         rerecordTagId = intent.getStringExtra("rerecord_tag_id")
         rerecordTitle = intent.getStringExtra("rerecord_title")
         rerecordDescription = intent.getStringExtra("rerecord_description")
         rerecordGroups = intent.getStringArrayExtra("rerecord_groups")?.toList()
-        
         isRerecording = rerecordTagId != null
+        
+        // Check for unknown tag recording
+        unknownTagId = intent.getStringExtra("tag_id")
+        isFromUnknownTag = intent.getBooleanExtra("from_unknown_tag", false)
         
         if (isRerecording) {
             Log.d("RecordingActivity", "Re-recording mode for tag: $rerecordTagId")
@@ -227,6 +235,14 @@ class RecordingActivity : ComponentActivity() {
         if (isRerecording) {
             // Handle re-recording - update existing tag directly
             handleRerecording()
+        } else if (isFromUnknownTag && unknownTagId != null) {
+            // Handle unknown tag recording - go directly to NFC writing with pre-set tag ID
+            val intent = Intent(this, NFCWritingActivity::class.java).apply {
+                putExtra("audio_file_path", recordedFilePath)
+                putExtra("tag_id", unknownTagId)
+                putExtra("from_unknown_tag", true)
+            }
+            startActivity(intent)
         } else {
             // Launch NFC writing activity for new recording
             val intent = Intent(this, NFCWritingActivity::class.java).apply {

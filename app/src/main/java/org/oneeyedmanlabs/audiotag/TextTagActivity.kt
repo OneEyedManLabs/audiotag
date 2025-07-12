@@ -42,8 +42,16 @@ class TextTagActivity : ComponentActivity() {
     private var newGroupText = mutableStateOf("")
     private var isCreating = mutableStateOf(false)
     
+    // Unknown tag state
+    private var unknownTagId: String? = null
+    private var isFromUnknownTag = false
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Check for unknown tag
+        unknownTagId = intent.getStringExtra("tag_id")
+        isFromUnknownTag = intent.getBooleanExtra("from_unknown_tag", false)
         
         // Initialize TTS service
         ttsService = TTSService(this)
@@ -126,6 +134,12 @@ class TextTagActivity : ComponentActivity() {
                     putExtra("tag_title", title)
                     putExtra("tag_description", tagDescription.value.trim().takeIf { it.isNotEmpty() })
                     putExtra("tag_groups", selectedGroups.value.toTypedArray())
+                    
+                    // Add unknown tag info if applicable
+                    if (isFromUnknownTag && unknownTagId != null) {
+                        putExtra("tag_id", unknownTagId)
+                        putExtra("from_unknown_tag", true)
+                    }
                 }
                 startActivity(intent)
                 finish()

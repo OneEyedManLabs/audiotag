@@ -29,6 +29,10 @@ class NFCService {
         }
         
         // Fallback to hardware tag ID from Intent
+        return getHardwareTagIdFromIntent(intent)
+    }
+    
+    fun getHardwareTagIdFromIntent(intent: Intent): String? {
         val tag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag::class.java)
         } else {
