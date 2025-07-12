@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
    AudioTag backup rules for Android Auto Backup
-   Conservative approach: only backup essential app data
-   Large audio files require manual export
+   Only backup essential app data: preferences and database
+   Audio files require manual export via in-app export feature
 -->
 <full-backup-content>
     <!-- Include app preferences/settings -->
@@ -10,7 +10,4 @@
     
     <!-- Include database files -->
     <include domain="database" path="."/>
-    
-    <!-- Exclude all external files - use manual export instead -->
-    <exclude domain="external" path="."/>
 </full-backup-content>
