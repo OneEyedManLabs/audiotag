@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-   AudioTagger backup rules for Android Auto Backup
-   Includes: database, settings, small audio files (<1MB)
-   Excludes: large audio files (>1MB) - use manual export instead
+   AudioTag backup rules for Android Auto Backup
+   Conservative approach: only backup essential app data
+   Large audio files require manual export
 -->
 <full-backup-content>
     <!-- Include app preferences/settings -->
@@ -11,13 +11,6 @@
     <!-- Include database files -->
     <include domain="database" path="."/>
     
-    <!-- Include small audio files only (under 1MB to stay within 25MB limit) -->
-    <include domain="file" path="audio_small/"/>
-    
-    <!-- Exclude large audio files - these need manual export -->
-    <exclude domain="file" path="audio_large/"/>
-    
-    <!-- Exclude temporary and cache files -->
-    <exclude domain="file" path="temp/"/>
-    <exclude domain="cache" path="."/>
+    <!-- Exclude all external files - use manual export instead -->
+    <exclude domain="external" path="."/>
 </full-backup-content>
