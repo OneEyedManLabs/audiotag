@@ -276,9 +276,9 @@ class ImportService(private val context: Context, private val repository: TagRep
                     type = tagData.getString("type"),
                     content = finalContent,
                     title = tagData.getString("title"),
-                    description = tagData.optString("description", null),
+                    description = tagData.optString("description").takeIf { it.isNotEmpty() },
                     groups = groups,
-                    locale = tagData.optString("locale", null),
+                    locale = tagData.optString("locale").takeIf { it.isNotEmpty() },
                     createdAt = tagData.getLong("createdAt")
                 )
                 

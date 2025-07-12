@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-   AudioTagger data extraction rules for Android 12+
-   Smart backup: includes database, settings, and small audio files only
+   AudioTag data extraction rules for Android 12+
+   Conservative backup: essential app data only
 -->
 <data-extraction-rules>
     <cloud-backup>
@@ -11,22 +11,14 @@
         <!-- Include database files -->
         <include domain="database" path="."/>
         
-        <!-- Include small audio files only -->
-        <include domain="file" path="audio_small/"/>
-        
-        <!-- Exclude large audio files -->
-        <exclude domain="file" path="audio_large/"/>
-        
-        <!-- Exclude temporary and cache files -->
-        <exclude domain="file" path="temp/"/>
-        <exclude domain="cache" path="."/>
+        <!-- Exclude external files - use manual export for audio -->
+        <exclude domain="external" path="."/>
     </cloud-backup>
     
-    <!-- Device-to-device transfer can include everything -->
+    <!-- Device-to-device transfer: include database and settings only -->
     <device-transfer>
         <include domain="sharedpref" path="."/>
         <include domain="database" path="."/>
-        <include domain="file" path="."/>
-        <exclude domain="cache" path="."/>
+        <exclude domain="external" path="."/>
     </device-transfer>
 </data-extraction-rules>
