@@ -19,6 +19,15 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("audiotag-release.keystore")
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "AudioTag2025!"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "audiotag"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "AudioTag2025!"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -26,6 +35,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
