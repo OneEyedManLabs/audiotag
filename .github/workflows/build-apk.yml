@@ -46,6 +46,12 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
       
+    - name: Decode and setup keystore for release builds
+      if: github.event.inputs.build_type == 'release' || github.event_name == 'push'
+      run: |
+        echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/audiotag-release.keystore
+        echo "Keystore decoded and placed in app directory"
+      
     - name: Build APK
       run: |
         if [ "${{ github.event.inputs.build_type }}" == "release" ] || [ "${{ github.event_name }}" == "push" ]; then
@@ -56,6 +62,10 @@ jobs:
           BUILD_TYPE="debug"
         fi
         echo "BUILD_TYPE=$BUILD_TYPE" >> $GITHUB_ENV
+      env:
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         
     - name: Get version info
       id: version
