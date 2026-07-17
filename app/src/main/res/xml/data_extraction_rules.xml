@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
    AudioTag data extraction rules for Android 12+
-   Only backup essential app data: preferences and database
-   Audio files use manual export feature for user control
+   Backup preferences, database, and audio recordings so restores are complete.
+   Note: Auto Backup has a 25MB quota; large libraries should use the in-app export feature.
 -->
 <data-extraction-rules>
     <cloud-backup>
@@ -11,11 +11,15 @@
         
         <!-- Include database files -->
         <include domain="database" path="."/>
+        
+        <!-- Include audio recordings referenced by the database -->
+        <include domain="file" path="audio_tags"/>
     </cloud-backup>
     
     <!-- Device-to-device transfer: same as cloud backup -->
     <device-transfer>
         <include domain="sharedpref" path="."/>
         <include domain="database" path="."/>
+        <include domain="file" path="audio_tags"/>
     </device-transfer>
 </data-extraction-rules>

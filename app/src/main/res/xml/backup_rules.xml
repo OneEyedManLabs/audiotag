@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
    AudioTag backup rules for Android Auto Backup
-   Only backup essential app data: preferences and database
-   Audio files require manual export via in-app export feature
+   Backup preferences, database, and audio recordings so restores are complete.
+   Note: Auto Backup has a 25MB quota; large libraries should use the in-app export feature.
 -->
 <full-backup-content>
     <!-- Include app preferences/settings -->
@@ -10,4 +10,7 @@
     
     <!-- Include database files -->
     <include domain="database" path="."/>
+    
+    <!-- Include audio recordings referenced by the database -->
+    <include domain="file" path="audio_tags"/>
 </full-backup-content>

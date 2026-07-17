@@ -309,7 +309,7 @@ class ExportService(private val context: Context, private val repository: TagRep
             appendLine("4. Select this file")
             appendLine()
             appendLine("Compatible with AudioTagger v2.0+")
-            appendLine("Visit: https://github.com/oneeyedmanlabs/audiotagger")
+            appendLine("Visit: https://github.com/OneEyedManLabs/audiotag")
         }
         
         addTextFileToZip(zip, "README.txt", readme)
