@@ -327,7 +327,7 @@ class ExportService(private val context: Context, private val repository: TagRep
     /**
      * Share export file using Android share intent
      */
-    suspend fun shareExport(exportResult: ExportResult, title: String = "Share AudioTagger Export"): Intent? {
+    suspend fun shareExport(exportResult: ExportResult, title: String = "Share AudioTag Export"): Intent? {
         if (!exportResult.success || exportResult.fileUri == null) {
             return null
         }

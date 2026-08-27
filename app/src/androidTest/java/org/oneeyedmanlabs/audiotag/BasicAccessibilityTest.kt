@@ -40,7 +40,7 @@ class BasicAccessibilityTest {
     @Test
     fun mainScreen_passesAccessibilityChecks() {
         // Simply finding elements triggers automatic accessibility validation
-        onView(withText("AudioTagger"))
+        onView(withText("AudioTag"))
             .check(matches(isDisplayed()))
         
         onView(withText("Record Audio Tag"))

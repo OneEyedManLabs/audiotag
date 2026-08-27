@@ -145,7 +145,7 @@ fun MainScreen(
         
         // App title
         Text(
-            text = "AudioTagger",
+            text = "AudioTag",
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,

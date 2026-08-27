@@ -495,7 +495,7 @@ fun RecordingScreen(
         AlertDialog(
             onDismissRequest = onDismissPermissionDialog,
             title = { Text("Audio Permission Required") },
-            text = { Text("AudioTagger needs microphone permission to record audio tags. Please grant permission in Settings.") },
+            text = { Text("AudioTag needs microphone permission to record audio tags. Please grant permission in Settings.") },
             confirmButton = {
                 TextButton(onClick = onDismissPermissionDialog) {
                     Text("OK")

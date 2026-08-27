@@ -13,18 +13,31 @@ android {
         applicationId = "org.oneeyedmanlabs.audiotag"
         minSdk = 31
         targetSdk = 36
-        versionCode = 2
+        versionCode = 3
         versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Signing credentials come from the environment, with no fallbacks. They
+    // used to be hardcoded here, which published the upload keystore password
+    // in a public repository.
+    //
+    // The config is only created when the credentials exist. Failing eagerly
+    // instead breaks `assembleDebug` too, because Gradle evaluates this block
+    // whichever task you run — so a release-only problem stopped every build.
+    val releaseStorePassword: String? = System.getenv("KEYSTORE_PASSWORD")
+    val releaseKeyPassword: String? = System.getenv("KEY_PASSWORD")
+    val canSignRelease = releaseStorePassword != null && releaseKeyPassword != null
+
     signingConfigs {
-        create("release") {
-            storeFile = file("audiotag-release.keystore")
-            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "AudioTag2025!"
-            keyAlias = System.getenv("KEY_ALIAS") ?: "audiotag"
-            keyPassword = System.getenv("KEY_PASSWORD") ?: "AudioTag2025!"
+        if (canSignRelease) {
+            create("release") {
+                storeFile = file("audiotag-release.keystore")
+                storePassword = releaseStorePassword
+                keyAlias = System.getenv("KEY_ALIAS") ?: "audiotag"
+                keyPassword = releaseKeyPassword
+            }
         }
     }
 
@@ -35,7 +48,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            // Unsigned when credentials are absent. Play rejects an unsigned
+            // bundle with a clear message, which is a better failure than a
+            // build that cannot be configured at all.
+            signingConfig = if (canSignRelease) signingConfigs.getByName("release") else null
         }
     }
     compileOptions {

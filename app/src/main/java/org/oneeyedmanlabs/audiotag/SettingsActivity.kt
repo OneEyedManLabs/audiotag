@@ -182,7 +182,7 @@ class SettingsActivity : ComponentActivity() {
                 val shareIntent = exportService.shareExport(result)
                 if (shareIntent != null) {
                     ttsService.speak("Export complete. ${result.tagCount} tags exported. Opening share menu.")
-                    startActivity(Intent.createChooser(shareIntent, "Share AudioTagger Export"))
+                    startActivity(Intent.createChooser(shareIntent, "Share AudioTag Export"))
                 } else {
                     ttsService.speak("Export created but sharing failed")
                 }
@@ -404,7 +404,7 @@ fun SettingsScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "AudioTagger",
+                            text = "AudioTag",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -804,7 +804,7 @@ fun ExportButtonsSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp)
-                .semantics { contentDescription = "Import AudioTagger export file to restore tags and audio" },
+                .semantics { contentDescription = "Import AudioTag export file to restore tags and audio" },
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.tertiary
             )
