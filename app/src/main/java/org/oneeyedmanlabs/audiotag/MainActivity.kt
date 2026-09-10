@@ -10,6 +10,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -149,10 +151,19 @@ fun MainScreen(
     onSettings: () -> Unit = {},
     onHelp: () -> Unit = {}
 ) {
+    // The status area is pinned to the bottom. The NFC notice is taller than
+    // the one-line status, so the content above scrolls when space is short.
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(32.dp)
     ) {
@@ -264,7 +275,9 @@ fun MainScreen(
             }
         }
         
-        Spacer(modifier = Modifier.weight(1f))
+    }
+
+        Spacer(modifier = Modifier.height(16.dp))
         
         // Status indicator
         when (nfcState) {
