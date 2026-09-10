@@ -120,15 +120,21 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
             
-            <!-- Fallback for tags without NDEF data -->
+            <!-- Blank or non-text tags dispatch as TECH_DISCOVERED. The tech list
+                 below only takes effect with this filter present. -->
+            <intent-filter android:priority="100">
+                <action android:name="android.nfc.action.TECH_DISCOVERED" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.nfc.action.TECH_DISCOVERED"
+                android:resource="@xml/nfc_tech_filter" />
+
+            <!-- Last resort when nothing else claimed the tag -->
             <intent-filter android:priority="100">
                 <action android:name="android.nfc.action.TAG_DISCOVERED" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
-            
-            <meta-data 
-                android:name="android.nfc.action.TECH_DISCOVERED"
-                android:resource="@xml/nfc_tech_filter" />
         </activity>
         
     </application>

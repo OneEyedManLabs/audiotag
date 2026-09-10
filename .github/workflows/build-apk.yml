@@ -28,10 +28,10 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Set up JDK 17
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: '17'
-        distribution: 'adopt'
+        distribution: 'temurin'
         
     - name: Cache Gradle packages
       uses: actions/cache@v4
@@ -55,7 +55,8 @@ jobs:
     - name: Build APK
       run: |
         if [ "${{ github.event.inputs.build_type }}" == "release" ] || [ "${{ github.event_name }}" == "push" ]; then
-          ./gradlew assembleRelease
+          # The APK is for sideloading; the AAB is what Play Console accepts.
+          ./gradlew assembleRelease bundleRelease
           BUILD_TYPE="release"
         else
           ./gradlew assembleDebug
@@ -89,18 +90,26 @@ jobs:
             echo "Renamed $apk to $new_name"
           fi
         done
+        if [ "$BUILD_TYPE" == "release" ]; then
+          mv ../../bundle/release/app-release.aab "AudioTag-$VERSION-release.aab"
+          echo "Renamed bundle to AudioTag-$VERSION-release.aab"
+        fi
         
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
         name: AudioTag-${{ steps.version.outputs.VERSION }}-${{ env.BUILD_TYPE }}
-        path: app/build/outputs/apk/${{ env.BUILD_TYPE }}/*.apk
+        path: |
+          app/build/outputs/apk/${{ env.BUILD_TYPE }}/*.apk
+          app/build/outputs/apk/${{ env.BUILD_TYPE }}/*.aab
         
     - name: Create Release (for tags)
       if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        files: app/build/outputs/apk/${{ env.BUILD_TYPE }}/*.apk
+        files: |
+          app/build/outputs/apk/${{ env.BUILD_TYPE }}/*.apk
+          app/build/outputs/apk/${{ env.BUILD_TYPE }}/*.aab
         draft: false
         prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
         generate_release_notes: true

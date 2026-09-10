@@ -77,7 +77,7 @@ When contributing to this AI-assisted project:
 ```bash
 # Standard Android development environment
 Android Studio Flamingo or newer
-Android SDK 24+ (Android 7.0+)
+Android SDK 31+ (Android 12+)
 Kotlin 1.8+
 Jetpack Compose BOM 2023.06.01+
 

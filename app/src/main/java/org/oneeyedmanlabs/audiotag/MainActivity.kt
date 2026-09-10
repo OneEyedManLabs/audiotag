@@ -2,10 +2,10 @@ package org.oneeyedmanlabs.audiotag
 
 import android.app.PendingIntent
 import android.content.Intent
-import android.content.IntentFilter
 import android.nfc.NfcAdapter
-import android.nfc.Tag
 import android.os.Bundle
+import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -21,7 +21,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.oneeyedmanlabs.audiotag.service.NFCService
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import org.oneeyedmanlabs.audiotag.service.NFCTagRouter
 import org.oneeyedmanlabs.audiotag.ui.theme.AudioTagTheme
 import org.oneeyedmanlabs.audiotag.ui.theme.ThemeManager
 import org.oneeyedmanlabs.audiotag.ui.theme.ThemeOption
@@ -34,8 +36,10 @@ class MainActivity : ComponentActivity() {
     
     private var nfcAdapter: NfcAdapter? = null
     private var pendingIntent: PendingIntent? = null
-    private var intentFilters: Array<IntentFilter>? = null
-    private val nfcService = NFCService()
+
+    // Refreshed in onResume so the notice clears when the user comes back
+    // from turning NFC on.
+    private val nfcState = mutableStateOf(NfcState.ON)
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,6 +56,8 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     MainScreen(
+                        nfcState = nfcState.value,
+                        onOpenNfcSettings = { openNfcSettings() },
                         onRecordAudio = {
                             startActivity(Intent(this@MainActivity, RecordingActivity::class.java))
                         },
@@ -86,14 +92,17 @@ class MainActivity : ComponentActivity() {
             Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_MUTABLE
         )
-        
-        val nfcIntentFilter = IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED)
-        intentFilters = arrayOf(nfcIntentFilter)
     }
     
     override fun onResume() {
         super.onResume()
-        nfcAdapter?.enableForegroundDispatch(this, pendingIntent, intentFilters, null)
+        nfcState.value = when {
+            nfcAdapter == null -> NfcState.UNAVAILABLE
+            nfcAdapter?.isEnabled != true -> NfcState.OFF
+            else -> NfcState.ON
+        }
+        // Null filters: while this screen is in front, every tag comes to us.
+        nfcAdapter?.enableForegroundDispatch(this, pendingIntent, null, null)
     }
     
     override fun onPause() {
@@ -107,28 +116,33 @@ class MainActivity : ComponentActivity() {
     }
     
     private fun handleNFCIntent(intent: Intent) {
-        val action = intent.action
-        if (NfcAdapter.ACTION_TAG_DISCOVERED == action ||
-            NfcAdapter.ACTION_NDEF_DISCOVERED == action ||
-            NfcAdapter.ACTION_TECH_DISCOVERED == action) {
-            
-            // Extract tag ID from intent
-            val tagId = nfcService.getTagIdFromIntent(intent)
-            
-            if (tagId != null) {
-                // Launch TagInfoActivity with foreground flag
-                val tagInfoIntent = Intent(this, TagInfoActivity::class.java).apply {
-                    putExtra("tag_id", tagId)
-                    putExtra("foreground_nfc_scan", true) // Mark as foreground NFC scan
-                }
-                startActivity(tagInfoIntent)
+        if (!NFCTagRouter.isNfcIntent(intent)) return
+        // Same routing as a background scan: known tags play, new tags offer
+        // to record. Stays in this task so Back returns here.
+        lifecycleScope.launch {
+            try {
+                NFCTagRouter.open(this@MainActivity, intent, newTask = false)
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Failed to route NFC tag", e)
             }
+        }
+    }
+
+    private fun openNfcSettings() {
+        try {
+            startActivity(Intent(Settings.ACTION_NFC_SETTINGS))
+        } catch (e: Exception) {
+            startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS))
         }
     }
 }
 
+enum class NfcState { ON, OFF, UNAVAILABLE }
+
 @Composable
 fun MainScreen(
+    nfcState: NfcState = NfcState.ON,
+    onOpenNfcSettings: () -> Unit = {},
     onRecordAudio: () -> Unit = {},
     onCreateTextTag: () -> Unit = {},
     onMyTags: () -> Unit = {},
@@ -253,12 +267,61 @@ fun MainScreen(
         Spacer(modifier = Modifier.weight(1f))
         
         // Status indicator
-        Text(
-            text = "Ready to create audio tags",
-            fontSize = 16.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),
-            textAlign = TextAlign.Center,
-            fontWeight = FontWeight.Medium
+        when (nfcState) {
+            NfcState.ON -> Text(
+                text = "Ready to create audio tags",
+                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Medium
+            )
+            NfcState.OFF -> NfcNotice(
+                message = "NFC is turned off. Tags cannot be scanned until it is on.",
+                buttonText = "Turn on NFC",
+                onClick = onOpenNfcSettings
+            )
+            NfcState.UNAVAILABLE -> NfcNotice(
+                message = "This device has no NFC, so tags cannot be scanned.",
+                buttonText = null,
+                onClick = {}
+            )
+        }
+    }
+}
+
+@Composable
+private fun NfcNotice(message: String, buttonText: String?, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = message },
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
         )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = message,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            if (buttonText != null) {
+                Button(
+                    onClick = onClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .semantics { contentDescription = "Open NFC settings to turn NFC on" }
+                ) {
+                    Text(text = buttonText, fontSize = 18.sp)
+                }
+            }
+        }
     }
 }
